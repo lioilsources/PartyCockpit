@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall';
 
 export type Party = {
   code: string;
@@ -12,6 +12,18 @@ export type Party = {
   joinUrl: string;
   scene: Scene;
   clients: Record<string, number>;
+  iceServers: RTCIceServer[];
+};
+
+/** A phone's live camera (backend api/streams.go). Stage only ever gets live ones. */
+export type LiveStream = {
+  id: string;
+  name: string;
+  source: 'browser' | 'mirrorbooth';
+  status: 'pending' | 'live' | 'ended';
+  online: boolean;
+  createdAt: number;
+  reason?: string;
 };
 
 export type AssetStatus = 'processing' | 'pending' | 'approved' | 'rejected' | 'failed';

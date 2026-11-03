@@ -17,7 +17,23 @@ const (
 	Stage   Role = "stage"
 	Cockpit Role = "cockpit"
 	Guest   Role = "guest"
+	// Streamer is a phone publishing live video (browser guest or MirrorBooth),
+	// authenticated by its stream key — see api/streams.go.
+	Streamer Role = "streamer"
 )
+
+// Peer identifies one WebSocket connection.
+type Peer struct {
+	ID       string // random per connection; viewers are addressed by it
+	Role     Role
+	StreamID string // Streamer only
+}
+
+// Handlers receive what clients send. Both may be nil.
+type Handlers struct {
+	OnMsg   func(code string, from Peer, raw []byte)
+	OnLeave func(code string, p Peer)
+}
 
 // Msg is the wire envelope: {"type": "...", "data": ...}.
 type Msg struct {
@@ -26,7 +42,7 @@ type Msg struct {
 }
 
 type client struct {
-	role Role
+	Peer
 	send chan []byte
 }
 
@@ -48,7 +64,7 @@ func (h *Hub) Broadcast(code string, msg Msg, roles ...Role) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for c := range h.rooms[code] {
-		if len(roles) > 0 && !has(roles, c.role) {
+		if len(roles) > 0 && !has(roles, c.Role) {
 			continue
 		}
 		select {
@@ -67,21 +83,58 @@ func has(roles []Role, r Role) bool {
 	return false
 }
 
+// SendTo delivers msg to the clients of the party for which match is true and
+// returns how many matched.
+func (h *Hub) SendTo(code string, msg Msg, match func(Peer) bool) int {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return 0
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	n := 0
+	for c := range h.rooms[code] {
+		if !match(c.Peer) {
+			continue
+		}
+		n++
+		select {
+		case c.send <- b:
+		default:
+		}
+	}
+	return n
+}
+
+// Find returns the connected peers of the party for which match is true.
+func (h *Hub) Find(code string, match func(Peer) bool) []Peer {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	var out []Peer
+	for c := range h.rooms[code] {
+		if match(c.Peer) {
+			out = append(out, c.Peer)
+		}
+	}
+	return out
+}
+
 // Counts returns connected clients per role.
 func (h *Hub) Counts(code string) map[Role]int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	out := map[Role]int{}
 	for c := range h.rooms[code] {
-		out[c.role]++
+		out[c.Role]++
 	}
 	return out
 }
 
 // Serve runs one WebSocket connection until it closes. hello is sent first
 // (the full state), so a reconnecting stage is consistent immediately.
-func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, role Role, hello []Msg) {
-	c := &client{role: role, send: make(chan []byte, 64)}
+// Client messages (WebRTC signalling) go to hs.OnMsg, at most 40 per second.
+func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, peer Peer, hello []Msg, hs Handlers) {
+	c := &client{Peer: peer, send: make(chan []byte, 64)}
 	h.mu.Lock()
 	if h.rooms[code] == nil {
 		h.rooms[code] = map[*client]struct{}{}
@@ -95,9 +148,35 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, role
 			delete(h.rooms, code)
 		}
 		h.mu.Unlock()
+		if hs.OnLeave != nil {
+			hs.OnLeave(code, peer)
+		}
 	}()
 
-	ctx = conn.CloseRead(ctx) // clients only listen; pings keep the line alive
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	conn.SetReadLimit(64 << 10) // an SDP is a few kB
+	go func() {
+		defer cancel()
+		window, n := time.Now(), 0
+		for {
+			typ, b, err := conn.Read(ctx)
+			if err != nil {
+				return
+			}
+			if typ != websocket.MessageText || hs.OnMsg == nil {
+				continue
+			}
+			if time.Since(window) > time.Second {
+				window, n = time.Now(), 0
+			}
+			if n++; n > 40 {
+				continue
+			}
+			hs.OnMsg(code, peer, b)
+		}
+	}()
+
 	for _, m := range hello {
 		b, _ := json.Marshal(m)
 		if err := write(ctx, conn, b); err != nil {

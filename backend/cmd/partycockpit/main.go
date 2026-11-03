@@ -90,6 +90,19 @@ func run() error {
 		hs.Shutdown(sctx)
 	}()
 	slog.Info("partycockpit listening", "addr", cfg.Addr, "public", cfg.PublicURL, "restyle", restyler.Name(), "moderation", cfg.Moderation, "web", srv.Web != nil)
+	if cfg.TLSCert != "" {
+		ts := &http.Server{Addr: cfg.TLSAddr, Handler: hs.Handler, ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			<-ctx.Done()
+			ts.Close()
+		}()
+		go func() {
+			slog.Info("https listening", "addr", cfg.TLSAddr)
+			if err := ts.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && err != http.ErrServerClosed {
+				slog.Error("https", "err", err)
+			}
+		}()
+	}
 	if err := hs.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}

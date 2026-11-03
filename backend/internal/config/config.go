@@ -3,6 +3,8 @@
 package config
 
 import (
+	"encoding/json"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -17,6 +19,14 @@ type Config struct {
 	AdminToken string
 	PartyTTL   time.Duration // PC_PARTY_TTL, how long a party lives; files are purged 7 days after
 	Workers    int           // PC_WORKERS, concurrent GPU jobs
+
+	// Optional HTTPS listener. Phones need a secure origin for the camera
+	// (browser streaming); everything else works over plain LAN http.
+	TLSAddr string // PC_TLS_ADDR, default ":8443"
+	TLSCert string // PC_TLS_CERT, PEM file; empty = no HTTPS
+	TLSKey  string // PC_TLS_KEY
+	// ICEServers is the RTCPeerConnection iceServers JSON (PC_ICE_SERVERS); default [].
+	ICEServers json.RawMessage
 
 	// FineTuneGallery (slideshow source).
 	GalleryURL               string // FINETUNE_URL
@@ -49,6 +59,10 @@ func Load() Config {
 		AdminToken:               env("PC_ADMIN_TOKEN", ""),
 		PartyTTL:                 dur("PC_PARTY_TTL", 24*time.Hour),
 		Workers:                  num("PC_WORKERS", 2),
+		TLSAddr:                  env("PC_TLS_ADDR", ":8443"),
+		TLSCert:                  env("PC_TLS_CERT", ""),
+		TLSKey:                   env("PC_TLS_KEY", ""),
+		ICEServers:               iceServers(env("PC_ICE_SERVERS", "[]")),
 		GalleryURL:               strings.TrimRight(env("FINETUNE_URL", "https://finetune.ol1n.com"), "/"),
 		GalleryAllowUnclassified: env("FINETUNE_ALLOW_UNCLASSIFIED", "") == "1",
 		DJfyURL:                  strings.TrimRight(env("DJFY_URL", "https://djfy.ol1n.com"), "/"),
@@ -91,4 +105,14 @@ func dur(k string, def time.Duration) time.Duration {
 		return d
 	}
 	return def
+}
+
+func iceServers(v string) json.RawMessage {
+	var list []map[string]any
+	if err := json.Unmarshal([]byte(v), &list); err != nil {
+		slog.Warn("PC_ICE_SERVERS is not a JSON array, ignoring", "err", err)
+		return json.RawMessage("[]")
+	}
+	b, _ := json.Marshal(list)
+	return b
 }

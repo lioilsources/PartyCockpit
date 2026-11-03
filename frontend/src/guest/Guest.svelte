@@ -5,6 +5,7 @@
   import type { Asset, Guest, MusicSnapshot, Party } from '../lib/types';
   import Photo from './Photo.svelte';
   import Music from './Music.svelte';
+  import Live from './Live.svelte';
 
   let { code }: { code: string } = $props();
 
@@ -16,7 +17,7 @@
   let nick = $state(store.get('pc.nick') ?? '');
   let err = $state('');
   let notFound = $state(false);
-  let tab = $state<'photo' | 'music' | 'note' | 'idea' | 'play'>('photo');
+  let tab = $state<'photo' | 'live' | 'music' | 'note' | 'idea' | 'play'>('photo');
   let toast = $state('');
   let won = $state('');
 
@@ -52,7 +53,7 @@
   }
   refresh();
 
-  const stop = connect(
+  const sock = connect(
     code,
     'guest',
     (m) => {
@@ -68,7 +69,7 @@
     if (mine.some((a) => a.status === 'processing')) refresh();
   }, 5000);
   onDestroy(() => {
-    stop();
+    sock.close();
     clearInterval(poll);
   });
 
@@ -152,13 +153,18 @@
 
     <nav>
       <button class:on={tab === 'photo'} onclick={() => (tab = 'photo')}>📸<span>Fotka</span></button>
+      <button class:on={tab === 'live'} onclick={() => (tab = 'live')}>📡<span>Živě</span></button>
       <button class:on={tab === 'music'} onclick={() => (tab = 'music')}>🎵<span>Hudba</span></button>
       <button class:on={tab === 'note'} onclick={() => (tab = 'note')}>✍️<span>Vzkaz</span></button>
       <button class:on={tab === 'idea'} onclick={() => (tab = 'idea')}>💡<span>Námět</span></button>
       <button class:on={tab === 'play'} onclick={() => (tab = 'play')}>🎮<span>Hra</span></button>
     </nav>
 
-    <section>
+    <!-- kept mounted: switching tabs must not cut the stream -->
+    <section hidden={tab !== 'live'}>
+      <Live {code} guestId={guest.id} iceServers={party?.iceServers ?? []} onmsg={say} />
+    </section>
+    <section hidden={tab === 'live'}>
       {#if tab === 'photo'}
         <Photo {code} guestId={guest.id} busy={mine.some((a) => a.status === 'processing')} onsent={() => { say('Fotka se maluje na Sparku 🎨'); refresh(); }} />
       {:else if tab === 'music'}
@@ -241,7 +247,7 @@
   }
   nav {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 6px;
     position: sticky;
     top: 0;
@@ -258,6 +264,9 @@
   }
   nav button span {
     font-size: 0.7rem;
+  }
+  section[hidden] {
+    display: none;
   }
   section {
     margin-top: 14px;

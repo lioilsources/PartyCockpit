@@ -42,6 +42,9 @@ type Server struct {
 	tempo     map[string]Tempo     // party → current tempo
 	tap       map[string]Tempo     // party → operator tap-tempo override
 	lastReact map[string]time.Time // guest → last reaction
+
+	smu     sync.Mutex
+	streams map[string]map[string]*Stream // party → stream id → live phone camera
 }
 
 // Tempo drives every scene's tick(beat). Source: tap | djfy | none; the stage
@@ -54,6 +57,7 @@ type Tempo struct {
 
 func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
+	s.streams = map[string]map[string]*Stream{}
 	s.jobs = make(chan jobTask, 256)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
 	parties, err := s.Store.Parties(ctx)
@@ -100,6 +104,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/search", s.guest(s.musicSearch))
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/propose", s.guest(s.musicPropose))
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/vote", s.guest(s.musicVote))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stream", s.guest(s.startStream))
+	mux.HandleFunc("DELETE /api/parties/{code}/guests/{gid}/stream", s.guest(s.stopStream))
 	mux.HandleFunc("GET /api/parties/{code}/queue", s.party(s.getQueue))
 	mux.HandleFunc("GET /api/parties/{code}/music", s.party(s.getMusic))
 	mux.HandleFunc("GET /files/{code}/{name}", s.serveFile)
@@ -116,6 +122,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/tempo", s.cockpit(s.setTempo))
 	mux.HandleFunc("POST /api/parties/{code}/lottery", s.cockpit(s.lottery))
 	mux.HandleFunc("GET /api/parties/{code}/ideas", s.cockpit(s.listIdeas))
+	mux.HandleFunc("GET /api/parties/{code}/streams", s.cockpit(s.listStreams))
+	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
+	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))
+	mux.HandleFunc("DELETE /api/parties/{code}/streams/{sid}", s.cockpit(s.kickStream))
 
 	// catalogs
 	mux.HandleFunc("GET /api/styles", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.Catalog.Public()) })
@@ -226,6 +236,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := hub.Role(r.URL.Query().Get("role"))
+	peer := hub.Peer{ID: "p" + randHex(6), Role: role}
 	switch role {
 	case hub.Stage, hub.Guest:
 	case hub.Cockpit:
@@ -233,8 +244,19 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 401, "neplatný cockpit token")
 			return
 		}
+	case hub.Streamer:
+		s.smu.Lock()
+		st := s.streamByKey(p.Code, r.URL.Query().Get("key"))
+		if st != nil {
+			peer.StreamID = st.ID
+		}
+		s.smu.Unlock()
+		if st == nil {
+			writeErr(w, 401, "neplatný klíč streamu")
+			return
+		}
 	default:
-		writeErr(w, 400, "role must be stage|cockpit|guest")
+		writeErr(w, 400, "role must be stage|cockpit|guest|streamer")
 		return
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true}) // LAN, any origin
@@ -246,7 +268,9 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 		conn.Close(websocket.StatusInternalError, "state")
 		return
 	}
-	s.Hub.Serve(context.WithoutCancel(r.Context()), conn, p.Code, role, hello)
+	hello = append(hello, hub.Msg{Type: "hello", Data: map[string]string{"peer": peer.ID}})
+	hello = append(hello, s.streamHello(p.Code, peer)...)
+	s.Hub.Serve(context.WithoutCancel(r.Context()), conn, p.Code, peer, hello, hub.Handlers{OnMsg: s.onMsg, OnLeave: s.onLeave})
 }
 
 func (s *Server) helloFor(r *http.Request, p store.Party, role hub.Role) ([]hub.Msg, error) {
@@ -256,7 +280,7 @@ func (s *Server) helloFor(r *http.Request, p store.Party, role hub.Role) ([]hub.
 		return nil, err
 	}
 	msgs := []hub.Msg{{Type: "party", Data: pub}}
-	if role != hub.Guest {
+	if role == hub.Stage || role == hub.Cockpit {
 		q, err := s.Store.StageQueue(ctx, p.Code)
 		if err != nil {
 			return nil, err

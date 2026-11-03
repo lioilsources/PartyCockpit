@@ -79,3 +79,25 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
   service token musí být povolený v Access aplikaci finetune. Slideshow bere jen
   `taxo.band == "safe"` (bez taxonomie nic, pokud není `FINETUNE_ALLOW_UNCLASSIFIED=1`).
 - **Webtoon** epizody = složky `data/webtoon/<id>/` s panely v pořadí názvů + `title.txt`.
+
+## D12: M3 živé streamy bez LiveKit (2026-11-03)
+- **Bez SFU.** Party je vždy v LAN (D2) a plátno má nejvýš 9 dlaždic, proto každý divák
+  (plátno, náhled v Cockpitu) otevírá peer-to-peer WebRTC spojení na každý telefon.
+  PartyCockpit jen přeposílá signalizaci po party WebSocketu (`api/streams.go`).
+  Plán §3.1 počítal s LiveKit, ale ten by byl další server a s ním i TURN. Přenosná
+  jedna binárka (D2) tím zůstává.
+- **Moderace.** Stream začíná jako `pending` a na plátno jde, až ho operátor pustí.
+  Cockpit vidí náhled i nepuštěných streamů. Server neposílá offer plátna na pending
+  stream. PANIC vrátí všechny streamy do `pending`.
+- **Telefon se ověřuje klíčem streamu** (`role=streamer&key=…`), ne ID hosta. ID hostů
+  jsou vidět v datech plátna, takže by šla zneužít.
+- **Prohlížeč potřebuje https kvůli kameře.** Plain http na LAN IP kameru nepovolí. Řešení:
+  `PC_TLS_CERT`/`PC_TLS_KEY` (certifikát pro jméno, které v LAN vede na party box) a
+  `PC_PUBLIC_URL=https://…`. MirrorBooth jako nativní appka https nepotřebuje.
+  Filtry v prohlížeči jsou kreslené na canvasu (zrcadlo, kaleido, ufon, pop).
+- **ICE.** Default `PC_ICE_SERVERS=[]` (host kandidáti). Plátno bez mikrofonu posílá jen
+  mDNS kandidáty, ale telefon s kamerou nebo MirrorBooth posílá skutečné IP, a to ke
+  spojení stačí. Kiosk Chrome přesto pouštěj s
+  `--disable-features=WebRtcHideLocalIpsWithMdns`.
+- **MirrorBooth** dělá vlastní session podle `docs/mirrorbooth-stream.md`. Klíčový úkol je
+  dostat do WebRTC výstup shaderu, protože dnes posílá surovou kameru.

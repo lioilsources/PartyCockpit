@@ -23,6 +23,7 @@ Mac Mini, Windows mini PC nebo domácí server.
 - **Now playing**: skladba a fronta z DJfy s hlasy.
 - **Webtoon**: předpřipravené epizody s auto-scrollem.
 - **Losování**: kdo hraje o přestávce.
+- **Živě**: mřížka živých kamer z telefonů (prohlížeč nebo MirrorBooth) až 3×3, po schválení operátorem.
 - **Mezihra**.
 
 Nad každou scénou běží emoji reakce (PixiJS), lišta s právě hrající skladbou a QR.
@@ -56,13 +57,20 @@ Hosty za Cloudflare Access ověřuje `CF_ACCESS_CLIENT_ID/SECRET`.
 
 ```sh
 # macOS
-open -a "Google Chrome" --args --kiosk --use-fake-ui-for-media-stream "http://localhost:8098/stage/KOD?audio=1"
+open -a "Google Chrome" --args --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?audio=1"
 # Windows
-chrome.exe --kiosk --use-fake-ui-for-media-stream "http://localhost:8098/stage/KOD?audio=1"
+chrome.exe --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?audio=1"
 ```
 
 `?audio=1` zapne detekci beatu z audio vstupu (BlackHole / VB-Cable / mikrofon).
 Přednost má ale BPM z DJfy nebo tap tempo z Cockpitu.
+
+## Živé streamy
+
+Peer-to-peer WebRTC v LAN, bez SFU a TURN. Server jen přeposílá signalizaci
+([DECISIONS.md D12](DECISIONS.md)). Kamera v mobilním prohlížeči potřebuje https: nastav
+`PC_TLS_CERT`/`PC_TLS_KEY` a `PC_PUBLIC_URL=https://…`. MirrorBooth https nepotřebuje.
+Protokol pro MirrorBooth je popsaný v [docs/mirrorbooth-stream.md](docs/mirrorbooth-stream.md).
 
 Rozhodnutí a odchylky od původního plánu jsou v [DECISIONS.md](DECISIONS.md), stav v
 [STATUS.md](STATUS.md) a plán v [Prompts/](Prompts/).

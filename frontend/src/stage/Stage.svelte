@@ -15,6 +15,9 @@
   import Webtoon from './scenes/Webtoon.svelte';
   import Lottery from './scenes/Lottery.svelte';
   import Blank from './scenes/Blank.svelte';
+  import PipWall from './scenes/PipWall.svelte';
+  import { Viewer, type RtcMsg } from '../lib/rtc';
+  import type { LiveStream } from '../lib/types';
 
   let { code }: { code: string } = $props();
 
@@ -36,6 +39,10 @@
   let reactions: Reactions;
   let pulse = $state(false);
   let needsAudioClick = $state(false);
+  let streams = $state<LiveStream[]>([]);
+  let rtcRev = $state(0);
+  // created before the socket; sends go through it once it exists
+  const viewer = new Viewer((m) => sock?.send(m) ?? false, [], () => rtcRev++);
 
   const clock = new BeatClock();
   clock.on(() => {
@@ -47,7 +54,7 @@
     store.set(cacheKey, JSON.stringify({ party, queue, music }));
   }
 
-  const stop = connect(
+  const sock = connect(
     code,
     'stage',
     (m) => {
@@ -70,6 +77,15 @@
         case 'panic':
           reactions?.clear();
           break;
+        case 'streams':
+          streams = m.data ?? [];
+          break;
+        case 'rtc':
+          viewer.handle(m.data as RtcMsg);
+          return;
+        case 'hello':
+          viewer.reset(); // new socket = new peer id; old offers are orphaned
+          return;
       }
       save();
     },
@@ -83,13 +99,21 @@
   }
 
   onDestroy(() => {
-    stop();
+    viewer.destroy();
+    sock.close();
     clock.destroy();
   });
 
   const scene = $derived(party?.scene ?? { kind: 'slideshow', params: {}, startedAt: 0 });
   const loopMode = $derived(party?.loopMode ?? 'loop');
   const sceneKey = $derived(`${scene.kind}:${scene.startedAt}`);
+
+  // phones are only connected while the wall is on screen (decoding 9 hidden
+  // streams would eat the mini PC)
+  $effect(() => {
+    viewer.setIce(party?.iceServers);
+    viewer.sync(scene.kind === 'pipwall' ? streams : []);
+  });
 
   function fullscreen() {
     if (needsAudioClick) {
@@ -115,6 +139,8 @@
         <Webtoon params={scene.params} />
       {:else if scene.kind === 'lottery'}
         <Lottery params={scene.params} />
+      {:else if scene.kind === 'pipwall'}
+        <PipWall {streams} {viewer} rev={rtcRev} {clock} />
       {:else}
         <Blank name={party?.name ?? ''} {clock} />
       {/if}

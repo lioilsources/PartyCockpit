@@ -64,6 +64,8 @@ type PublicParty struct {
 	JoinURL string      `json:"joinUrl"`
 	Scene   store.Scene `json:"scene"`
 	Clients any         `json:"clients"`
+	// IceServers for RTCPeerConnection; empty on a LAN party (host candidates suffice).
+	IceServers json.RawMessage `json:"iceServers"`
 }
 
 func (s *Server) joinURL(r *http.Request, code string) string {
@@ -80,7 +82,7 @@ func (s *Server) joinURL(r *http.Request, code string) string {
 
 func (s *Server) publicParty(r *http.Request, p store.Party) (PublicParty, error) {
 	sc, err := s.Store.Scene(r.Context(), p.Code)
-	return PublicParty{Party: p, JoinURL: s.joinURL(r, p.Code), Scene: sc, Clients: s.Hub.Counts(p.Code)}, err
+	return PublicParty{Party: p, JoinURL: s.joinURL(r, p.Code), Scene: sc, Clients: s.Hub.Counts(p.Code), IceServers: s.Cfg.ICEServers}, err
 }
 
 func (s *Server) getParty(w http.ResponseWriter, r *http.Request, p store.Party) {
@@ -411,7 +413,7 @@ func (s *Server) listIdeas(w http.ResponseWriter, r *http.Request, p store.Party
 
 var sceneKinds = map[string]bool{
 	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
-	"webtoon": true, "lottery": true, "blank": true,
+	"webtoon": true, "lottery": true, "blank": true, "pipwall": true,
 }
 
 func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party) {
@@ -437,6 +439,7 @@ func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.unliveAll(p.Code)
 	s.Hub.Broadcast(p.Code, hub.Msg{Type: "panic", Data: nil})
 	s.broadcastParty(r, p.Code)
 	w.WriteHeader(204)

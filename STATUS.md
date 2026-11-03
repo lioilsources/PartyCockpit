@@ -23,10 +23,29 @@ schválení → fronta → scéna) a screenshoty Stage, Cockpitu i Guest v Chrom
 - AiStack kontext: hodnota `aspect_ratio: match_input_image` a pole `image` jako data URI
   jsou odhad (nim-kontext-proxy je jen přeposílá do NIM).
 
+## 2026-11-03: M3 živé streamy (PartyCockpit strana)
+
+| Část | Stav |
+|---|---|
+| signalizace WebRTC přes party WS, stream registry, moderace, PANIC | ✅ `api/streams.go` + integrační test |
+| scéna `pipwall` (1 → 2×2 → 3×3, rámeček na beat) | ✅ |
+| Cockpit: náhledy streamů, pustit / stáhnout / ukončit | ✅ |
+| Guest záložka „Živě“: kamera + canvas filtry → stream | ✅ (potřebuje https) |
+| HTTPS listener (`PC_TLS_*`), `PC_ICE_SERVERS` | ✅ |
+| MirrorBooth „Stream to party“ | ⏳ zadání v `docs/mirrorbooth-stream.md` (MacBook session) |
+
+Ověřeno v Chrome: dva simulované telefony (canvas) se po „✓ pustit“ v Cockpitu objevily
+na plátně ve 2 sloupcích, Cockpit ukazoval náhledy pending streamů a PANIC je stáhl.
+Simulace přepisovala mDNS kandidáty na 127.0.0.1, protože dvě záložky bez kamery
+na jednom Macu se přes mDNS nespojí.
+**Neověřeno:** skutečný telefon na LAN, https certifikát, latence pod 1 s, 4 a více streamů.
+
+Pozn.: na tomhle Macu drží port 8098 zapomenutý `python -m http.server 8098` (od 18. 10.).
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
-3. M3 LiveKit + MirrorBooth (LAN-only, bez TURN).
+3. M3 dokončit: MirrorBooth podle `docs/mirrorbooth-stream.md`, test na LAN s telefony.
 4. M4 idle animace galerie a 2D tanec. Restyler umí `live_portrait` a `wan_motion`,
    takže je to kandidát i na tanec / „Oživit“.
 5. HandWrittenStickers jako HTTP služba (glyph extraktor).

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api, store } from '../lib/api';
-  import { connect } from '../lib/ws';
+  import { connect, type Socket } from '../lib/ws';
   import { TapTempo } from '../lib/beat';
-  import { fileUrl, type Asset, type CockpitState, type Episode, type MusicSnapshot, type Party, type SceneKind, type Tempo } from '../lib/types';
+  import { Viewer, srcObject, type RtcMsg } from '../lib/rtc';
+  import { fileUrl, type Asset, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type Tempo } from '../lib/types';
 
   let { code }: { code: string } = $props();
 
@@ -23,13 +24,16 @@
   let online = $state(false);
   let err = $state('');
   let tokenInput = $state('');
-  let stop: (() => void) | null = null;
+  let sock: Socket | null = null;
 
   let reactions = $state<string[]>([]);
+  let streams = $state<LiveStream[]>([]);
+  let rtcRev = $state(0);
+  let viewer = $state<Viewer | null>(null);
 
   function start() {
-    stop?.();
-    stop = connect(
+    sock?.close();
+    sock = connect(
       code,
       'cockpit',
       (m) => {
@@ -39,10 +43,15 @@
         else if (m.type === 'music') music = m.data;
         else if (m.type === 'tempo') tempo = m.data;
         else if (m.type === 'reaction') reactions = [m.data.emoji, ...reactions].slice(0, 14);
+        else if (m.type === 'streams') streams = m.data ?? [];
+        else if (m.type === 'rtc') viewer?.handle(m.data as RtcMsg);
+        else if (m.type === 'hello') viewer?.reset();
       },
       (o) => (online = o),
-      token,
+      { token },
     );
+    viewer?.destroy();
+    viewer = new Viewer(sock.send, party?.iceServers ?? [], () => rtcRev++);
   }
 
   // check the token once, then go live
@@ -58,7 +67,26 @@
     }
   }
   if (token) login();
-  onDestroy(() => stop?.());
+  onDestroy(() => {
+    viewer?.destroy();
+    sock?.close();
+  });
+
+  // ── live streams: the cockpit previews every phone, pending ones included,
+  // so the operator sees who they let on the wall
+  let previews = $state(true);
+  $effect(() => {
+    // read the inputs first: `viewer?.` would skip them and the effect would never re-run
+    const ice = party?.iceServers;
+    const want = previews ? streams : [];
+    viewer?.setIce(ice);
+    viewer?.sync(want);
+  });
+  const streamMedia = $derived.by(() => {
+    void rtcRev;
+    return new Map(streams.map((s) => [s.id, viewer?.media(s.id)]));
+  });
+  const liveCount = $derived(streams.filter((s) => s.status === 'live').length);
 
   async function act(fn: () => Promise<unknown>) {
     try {
@@ -79,6 +107,7 @@
     { kind: 'nowplaying', label: '🎵 Now playing' },
     { kind: 'webtoon', label: '📖 Webtoon' },
     { kind: 'lottery', label: '🎲 Losování' },
+    { kind: 'pipwall', label: '📡 Živě (streamy)' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
   let slideStyle = $state('');
@@ -273,6 +302,39 @@
             <li class="muted">prázdná — schválený obsah se sem řadí</li>
           {/each}
         </ol>
+      </section>
+
+      <section>
+        <h2>
+          Živé streamy ({liveCount}/9 na plátně)
+          <label class="small muted"><input type="checkbox" bind:checked={previews} /> náhledy</label>
+        </h2>
+        <div class="cards">
+          {#each streams as s (s.id)}
+            <div class="card stream" class:live={s.status === 'live'}>
+              {#if streamMedia.get(s.id)}
+                <!-- svelte-ignore a11y_media_has_caption -->
+                <video use:srcObject={streamMedia.get(s.id)} autoplay playsinline muted></video>
+              {:else}
+                <div class="novid">{s.online ? (previews ? 'připojuji…' : 'bez náhledu') : 'offline'}</div>
+              {/if}
+              <div class="meta">
+                <strong>{s.name}</strong>
+                <span>{s.source === 'mirrorbooth' ? '🪞 MirrorBooth' : '📡 prohlížeč'} · {s.status === 'live' ? '🔴 na plátně' : 'čeká'}</span>
+              </div>
+              <div class="row">
+                {#if s.status === 'live'}
+                  <button onclick={() => act(() => api.post(p(`/streams/${s.id}/hold`), {}, token))}>stáhnout</button>
+                {:else}
+                  <button class="ok" onclick={() => act(() => api.post(p(`/streams/${s.id}/approve`), {}, token))}>✓ pustit</button>
+                {/if}
+                <button class="bad" onclick={() => act(() => api.del(p(`/streams/${s.id}`), token))}>✕</button>
+              </div>
+            </div>
+          {:else}
+            <p class="muted">nikdo nevysílá — hosté: záložka „Živě“, nebo MirrorBooth</p>
+          {/each}
+        </div>
       </section>
 
       <section>
@@ -512,5 +574,20 @@
   }
   .ideas li {
     margin-bottom: 6px;
+  }
+  .card.stream video,
+  .card.stream .novid {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 8px;
+    background: #000;
+    display: grid;
+    place-items: center;
+    font-size: 0.8rem;
+    opacity: 0.9;
+  }
+  .card.stream.live {
+    outline: 2px solid var(--red);
   }
 </style>
