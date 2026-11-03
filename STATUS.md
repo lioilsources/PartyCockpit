@@ -42,11 +42,28 @@ na jednom Macu se přes mDNS nespojí.
 
 Pozn.: na tomhle Macu drží port 8098 zapomenutý `python -m http.server 8098` (od 18. 10.).
 
+## 2026-11-03: M4 živé portréty a tanec (PartyCockpit strana)
+
+| Část | Stav |
+|---|---|
+| provider `Comfy` (upload, /prompt, /history, /view, driver), `RestylerAnimator`, `MockAnimator` | ✅ testy proti fake ComfyUI |
+| workflow `live_portrait.json`, `wan_i2v.json` | ⏳ šablony, ověřuje a upravuje L40S session |
+| driver `alive` | ⏳ L40S session (syntetický) → `assets/drivers/alive.mp4` |
+| auto-oživení schválených fotek, „✨ Oživit galerii“, galerie hraje smyčky | ✅ |
+| „Roztanči mě“ v telefonu, schválení, scéna Tančírna (tempo ±10 %) | ✅ |
+
+Ověřeno: Go testy (celý tok na mocku, Comfy proti fake serveru, store) a v Chrome
+na mocku Tančírna se 3 tanečníky, galerie s živým portrétem a „Roztanči mě“.
+Opravena chyba: auto-oživení blokovalo hostovi nahrání fotky.
+**Neověřeno:** reálný ComfyUI na L40S. Inventura: Wan 2.2 I2V 14B + lightx2v je
+k dispozici (~47 s na klip 832×480×81), LivePortraitKJ chybí. Instalace čeká na
+souhlas uživatele v L40S session.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
 3. M3 dokončit: MirrorBooth podle `docs/mirrorbooth-stream.md`, test na LAN s telefony.
-4. M4 idle animace galerie a 2D tanec. Restyler umí `live_portrait` a `wan_motion`,
-   takže je to kandidát i na tanec / „Oživit“.
+4. M4 dokončit: v L40S session schválit instalaci LivePortraitKJ a pauzu AZ, pak
+   ověřit `ANIMATE_PROVIDER=comfy` s workflow a driverem od L40S.
 5. HandWrittenStickers jako HTTP služba (glyph extraktor).
 6. Hry o přestávce (Three.js, co-op), napojené na výsledek losování.

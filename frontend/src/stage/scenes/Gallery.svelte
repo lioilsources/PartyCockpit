@@ -3,6 +3,7 @@
   import { ShowQueue } from '../../lib/showqueue';
   import type { BeatClock } from '../../lib/beat';
   import { fileUrl, type Asset } from '../../lib/types';
+  import Clip from '../../lib/Clip.svelte';
 
   // Guest Gallery: approved restyles from the show queue, one hero + a strip of
   // the latest. Runs through the queue, then loops/shuffles (D5).
@@ -14,7 +15,7 @@
     clock,
   }: { code: string; queue: Asset[]; loopMode: 'loop' | 'shuffle'; params: Record<string, any>; clock: BeatClock } = $props();
 
-  const photos = $derived(queue.filter((a) => a.kind !== 'sticker' && a.file));
+  const photos = $derived(queue.filter((a) => (a.kind === 'restyle' || a.kind === 'upload') && a.file));
   const beats = $derived(Math.max(2, Number(params.beats) || 8));
   const picker = new ShowQueue<Asset>();
   let hero = $state<Asset | null>(null);
@@ -44,7 +45,8 @@
   {#if hero}
     {#key heroKey}
       <figure class="hero">
-        <img src={fileUrl(code, hero.file)} alt="" />
+        <!-- living picture (M4) when its loop is ready, the still otherwise -->
+        <Clip src={fileUrl(code, hero.live ?? hero.file)} />
         <figcaption>
           <strong>{hero.meta.nickname ?? 'host'}</strong>
           {#if hero.meta.styleLabel && !hero.meta.fallback}<span>jako {hero.meta.styleLabel}</span>{/if}
@@ -78,7 +80,8 @@
     height: 78vh;
     animation: pop 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   }
-  .hero img {
+  .hero :global(img),
+  .hero :global(video) {
     height: 100%;
     border-radius: 1.4vw;
     box-shadow: 0 2vw 6vw rgba(0, 0, 0, 0.6), 0 0 0 0.4vw rgba(255, 255, 255, 0.08);

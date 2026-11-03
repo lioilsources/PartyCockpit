@@ -18,6 +18,8 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `backend/internal/api` — HTTP + WS; `jobs.go` worker pool (restyle → klasifikace → pending),
   `music.go` DJfy + tempo, `handlers.go` vše ostatní
 - `backend/internal/store` — SQLite (`modernc.org/sqlite`, bez CGO); migrace v `schema.go`
+- `backend/internal/api/animate.go` — M4: živé portréty (dědí schválení) a tance (čekají na operátora)
+- `backend/internal/providers/animate.go` — Comfy (L40S), Restyler, mock animátor; `workflows/*.json`
 - `backend/internal/providers` — Restyler backend, AiStack kontext, mock, WD14 klasifikátor;
   `restyle_styles.json` je generovaný z Restyleru
 - `backend/internal/api/streams.go` — živé streamy: registry + WebRTC signalizace (P2P, LAN)
@@ -32,6 +34,8 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - **Nic od hosta na plátno bez schválení.** Stage čte jen `stage_queue` (approved).
   Originál po selhaném restyle se nikdy neschvaluje automaticky.
 - Originální fotky (`kind=upload`, `status=source`) se na plátno nedostanou nikdy.
+- Živý portrét dědí schválení fotky. Tanec čeká na operátora vždy, i v relaxed režimu.
+- GPU pro animace jede přes L40S session (ComfyUI). SPARK jen přes broker.
 - Živý stream jde na plátno až po „pustit“ v Cockpitu. Server plátnu neposílá pending streamy.
 - GPU se nečeká synchronně: upload vrátí 202, job běží ve worker poolu.
 - Limit 1 rozpracovaný restyle na hosta.
@@ -41,7 +45,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 
 ## Odchylky od plánu
 SQLite místo Postgres (přenosný party box), port 8098, restyle přes Restyler backend,
-stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit. Detail v `DECISIONS.md` D2, D11, D12.
+stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit, animace přímo přes ComfyUI. Detail v `DECISIONS.md` D2, D11–D13.
 
 ## Kam dál
-`STATUS.md`: M3 MirrorBooth stream, idle animace, tanec, 3D hry, HandWrittenStickers.
+`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, tanec, 3D hry, HandWrittenStickers.

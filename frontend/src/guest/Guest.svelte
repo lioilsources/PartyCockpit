@@ -6,6 +6,8 @@
   import Photo from './Photo.svelte';
   import Music from './Music.svelte';
   import Live from './Live.svelte';
+  import Dance from './Dance.svelte';
+  import Clip from '../lib/Clip.svelte';
 
   let { code }: { code: string } = $props();
 
@@ -119,7 +121,7 @@
   }
 
   const statusLabel: Record<string, string> = {
-    processing: '🎨 maluje se…',
+    processing: '🎨 pracuje se…',
     pending: '⏳ čeká na schválení',
     approved: '✅ na plátně',
     rejected: '— nepoužito',
@@ -166,7 +168,8 @@
     </section>
     <section hidden={tab === 'live'}>
       {#if tab === 'photo'}
-        <Photo {code} guestId={guest.id} busy={mine.some((a) => a.status === 'processing')} onsent={() => { say('Fotka se maluje na Sparku 🎨'); refresh(); }} />
+        <Photo {code} guestId={guest.id} busy={mine.some((a) => a.status === 'processing' && a.kind !== 'live')} onsent={() => { say('Fotka se maluje na GPU 🎨'); refresh(); }} />
+        <Dance {code} guestId={guest.id} {mine} busy={mine.some((a) => a.status === 'processing' && a.kind !== 'live')} onmsg={say} onsent={refresh} />
       {:else if tab === 'music'}
         <Music {code} guestId={guest.id} {music} djfyCode={party?.djfyCode ?? ''} onmsg={say} />
       {:else if tab === 'note'}
@@ -203,6 +206,9 @@
               {#if a.kind === 'sticker'}
                 <span class="mini" style:background={a.meta.color}>✍️</span>
                 <span class="t">{a.meta.text}</span>
+              {:else if a.kind === 'live' || a.kind === 'dance'}
+                {#if a.file}<Clip src={`/files/${code}/${a.file}`} cls="mini" />{:else}<span class="mini">{a.kind === 'dance' ? '💃' : '✨'}</span>{/if}
+                <span class="t">{a.kind === 'dance' ? `tanec ${a.meta.motionLabel ?? ''}` : 'živý portrét'}</span>
               {:else}
                 {#if a.file}<img src={`/files/${code}/${a.file}`} alt="" />{:else}<span class="mini">🎨</span>{/if}
                 <span class="t">{a.meta.styleLabel}</span>
@@ -311,6 +317,8 @@
     font-size: 0.9rem;
   }
   .mine img,
+  .mine :global(video.mini),
+  .mine :global(img.mini),
   .mini {
     width: 48px;
     height: 48px;

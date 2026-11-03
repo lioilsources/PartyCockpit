@@ -45,7 +45,7 @@ func newEnv(t *testing.T) *env {
 		Cfg: cfg, Store: st, Hub: hub.New(),
 		Gallery: gallery.New("http://127.0.0.1:1", filepath.Join(dir, "gc"), false, nil),
 		DJfy:    djfy.New("http://127.0.0.1:1"), Catalog: cat,
-		Restyler: &providers.Mock{}, Classifier: providers.NoClassifier{},
+		Restyler: &providers.Mock{}, Animator: providers.MockAnimator{}, Classifier: providers.NoClassifier{},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

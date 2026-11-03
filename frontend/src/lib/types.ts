@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance';
 
 export type Party = {
   code: string;
@@ -13,7 +13,14 @@ export type Party = {
   scene: Scene;
   clients: Record<string, number>;
   iceServers: RTCIceServer[];
+  autoLive: boolean;
 };
+
+/** Animation presets (backend providers/animate.go). */
+export type Motion = { id: string; label: string; engine: 'live' | 'dance'; seconds: number };
+
+/** Clips are mp4 from the GPU, animated GIF from the mock provider. */
+export const isVideo = (file?: string) => !!file && /\.(mp4|webm)$/i.test(file);
 
 /** A phone's live camera (backend api/streams.go). Stage only ever gets live ones. */
 export type LiveStream = {
@@ -30,7 +37,7 @@ export type AssetStatus = 'processing' | 'pending' | 'approved' | 'rejected' | '
 export type Asset = {
   id: string;
   guestId: string;
-  kind: 'restyle' | 'sticker' | 'upload';
+  kind: 'restyle' | 'sticker' | 'upload' | 'live' | 'dance';
   srcId?: string;
   file?: string;
   meta: {
@@ -43,7 +50,12 @@ export type Asset = {
     original?: string;
     fallback?: boolean;
     error?: string;
+    motion?: string;
+    motionLabel?: string;
+    photo?: string;
   };
+  /** Approved LivePortrait loop of this photo (show queue only, M4). */
+  live?: string;
   nsfwScore: number;
   status: AssetStatus;
   createdAt: number;
@@ -76,7 +88,7 @@ export type CockpitState = {
   ideas: Idea[];
   jobs: { intent: string; status: string; count: number; avgMs: number }[];
   clients: Record<string, number>;
-  config: { restyle: string; moderation: string; autoApproveMax: number; djfyUrl: string };
+  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string };
 };
 
 export const fileUrl = (code: string, file?: string) => (file ? `/files/${code}/${file}` : '');

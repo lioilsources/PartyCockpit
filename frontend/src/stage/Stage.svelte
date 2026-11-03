@@ -16,6 +16,7 @@
   import Lottery from './scenes/Lottery.svelte';
   import Blank from './scenes/Blank.svelte';
   import PipWall from './scenes/PipWall.svelte';
+  import DanceFloor from './scenes/DanceFloor.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
 
@@ -40,6 +41,7 @@
   let pulse = $state(false);
   let needsAudioClick = $state(false);
   let streams = $state<LiveStream[]>([]);
+  let tempo = $state<Tempo | null>(null);
   let rtcRev = $state(0);
   // created before the socket; sends go through it once it exists
   const viewer = new Viewer((m) => sock?.send(m) ?? false, [], () => rtcRev++);
@@ -69,7 +71,8 @@
           music = m.data;
           break;
         case 'tempo':
-          clock.setTempo(m.data as Tempo);
+          tempo = m.data as Tempo;
+          clock.setTempo(tempo);
           break;
         case 'reaction':
           reactions?.add(m.data.emoji);
@@ -139,6 +142,8 @@
         <Webtoon params={scene.params} />
       {:else if scene.kind === 'lottery'}
         <Lottery params={scene.params} />
+      {:else if scene.kind === 'dance'}
+        <DanceFloor {code} {queue} {loopMode} params={scene.params} {tempo} {clock} />
       {:else if scene.kind === 'pipwall'}
         <PipWall {streams} {viewer} rev={rtcRev} {clock} />
       {:else}

@@ -33,10 +33,12 @@ type Server struct {
 	DJfy       *djfy.Manager
 	Catalog    *providers.Catalog
 	Restyler   providers.Restyler
+	Animator   providers.Animator
 	Classifier providers.Classifier
 	Web        fs.FS // built frontend (may be empty in dev)
 
-	jobs chan jobTask
+	jobs  chan jobTask
+	anims chan animTask
 
 	mu        sync.Mutex
 	tempo     map[string]Tempo     // party → current tempo
@@ -59,6 +61,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
 	s.streams = map[string]map[string]*Stream{}
 	s.jobs = make(chan jobTask, 256)
+	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
 	parties, err := s.Store.Parties(ctx)
 	if err != nil {
@@ -78,6 +81,9 @@ func (s *Server) Init(ctx context.Context) error {
 	}
 	for range max(1, s.Cfg.Workers) {
 		go s.worker()
+	}
+	for range max(1, s.Cfg.AnimWorkers) {
+		go s.animWorker()
 	}
 	go s.janitor()
 	return nil
@@ -106,6 +112,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/vote", s.guest(s.musicVote))
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stream", s.guest(s.startStream))
 	mux.HandleFunc("DELETE /api/parties/{code}/guests/{gid}/stream", s.guest(s.stopStream))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/dance", s.guest(s.dance))
 	mux.HandleFunc("GET /api/parties/{code}/queue", s.party(s.getQueue))
 	mux.HandleFunc("GET /api/parties/{code}/music", s.party(s.getMusic))
 	mux.HandleFunc("GET /files/{code}/{name}", s.serveFile)
@@ -123,11 +130,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/lottery", s.cockpit(s.lottery))
 	mux.HandleFunc("GET /api/parties/{code}/ideas", s.cockpit(s.listIdeas))
 	mux.HandleFunc("GET /api/parties/{code}/streams", s.cockpit(s.listStreams))
+	mux.HandleFunc("POST /api/parties/{code}/animate", s.cockpit(s.animateGallery))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))
 	mux.HandleFunc("DELETE /api/parties/{code}/streams/{sid}", s.cockpit(s.kickStream))
 
 	// catalogs
+	mux.HandleFunc("GET /api/motions", s.listMotions)
 	mux.HandleFunc("GET /api/styles", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.Catalog.Public()) })
 	mux.HandleFunc("GET /api/gallery", s.listGallery)
 	mux.HandleFunc("GET /api/gallery/{kind}/{sha}", func(w http.ResponseWriter, r *http.Request) {

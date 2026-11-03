@@ -91,15 +91,16 @@ type Party struct {
 	LoopMode     string `json:"loopMode"`
 	CockpitToken string `json:"-"`
 	DJfyCode     string `json:"djfyCode"`
+	AutoLive     bool   `json:"autoLive"` // animate every approved photo (M4)
 	CreatedAt    int64  `json:"createdAt"`
 	EndsAt       int64  `json:"endsAt"`
 }
 
-const partyCols = "code, name, mode, loop_mode, cockpit_token, djfy_code, created_at, ends_at"
+const partyCols = "code, name, mode, loop_mode, cockpit_token, djfy_code, auto_live, created_at, ends_at"
 
 func scanParty(r interface{ Scan(...any) error }) (Party, error) {
 	var p Party
-	err := r.Scan(&p.Code, &p.Name, &p.Mode, &p.LoopMode, &p.CockpitToken, &p.DJfyCode, &p.CreatedAt, &p.EndsAt)
+	err := r.Scan(&p.Code, &p.Name, &p.Mode, &p.LoopMode, &p.CockpitToken, &p.DJfyCode, &p.AutoLive, &p.CreatedAt, &p.EndsAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -112,8 +113,8 @@ func (s *Store) CreateParty(ctx context.Context, name string, ttl time.Duration)
 		CreatedAt: now.UnixMilli(), EndsAt: now.Add(ttl).UnixMilli()}
 	for range 5 {
 		p.Code = newPartyCode()
-		_, err := s.db.ExecContext(ctx, "INSERT INTO parties("+partyCols+") VALUES(?,?,?,?,?,?,?,?)",
-			p.Code, p.Name, p.Mode, p.LoopMode, p.CockpitToken, p.DJfyCode, p.CreatedAt, p.EndsAt)
+		_, err := s.db.ExecContext(ctx, "INSERT INTO parties("+partyCols+") VALUES(?,?,?,?,?,?,?,?,?)",
+			p.Code, p.Name, p.Mode, p.LoopMode, p.CockpitToken, p.DJfyCode, p.AutoLive, p.CreatedAt, p.EndsAt)
 		if err == nil {
 			_, err = s.db.ExecContext(ctx, "INSERT INTO scene_state(party_code, kind, started_at) VALUES(?, 'slideshow', ?)", p.Code, p.CreatedAt)
 			return p, err
@@ -151,6 +152,7 @@ type PartyPatch struct {
 	Mode     *string `json:"mode"`
 	LoopMode *string `json:"loopMode"`
 	DJfyCode *string `json:"djfyCode"`
+	AutoLive *bool   `json:"autoLive"`
 }
 
 func (s *Store) UpdateParty(ctx context.Context, code string, p PartyPatch) error {
@@ -161,7 +163,11 @@ func (s *Store) UpdateParty(ctx context.Context, code string, p PartyPatch) erro
 		_, err := s.db.ExecContext(ctx, "UPDATE parties SET "+col+" = ? WHERE code = ?", *v, code)
 		return err
 	}
-	return errors.Join(set("name", p.Name), set("mode", p.Mode), set("loop_mode", p.LoopMode), set("djfy_code", p.DJfyCode))
+	var autoErr error
+	if p.AutoLive != nil {
+		_, autoErr = s.db.ExecContext(ctx, "UPDATE parties SET auto_live = ? WHERE code = ?", *p.AutoLive, code)
+	}
+	return errors.Join(set("name", p.Name), set("mode", p.Mode), set("loop_mode", p.LoopMode), set("djfy_code", p.DJfyCode), autoErr)
 }
 
 // ExpiredParties returns parties whose end lies more than grace in the past.
@@ -249,6 +255,8 @@ type Asset struct {
 	NSFWScore float64         `json:"nsfwScore"`
 	Status    string          `json:"status"`
 	CreatedAt int64           `json:"createdAt"`
+	// Live is the approved LivePortrait loop of this photo; StageQueue only.
+	Live string `json:"live,omitempty"`
 }
 
 const assetCols = "id, party_code, guest_id, kind, src_id, file, meta, nsfw_score, status, created_at"
@@ -324,10 +332,12 @@ func (s *Store) GuestAssets(ctx context.Context, code, guestID string) ([]Asset,
 	return s.queryAssets(ctx, "SELECT "+assetCols+" FROM assets WHERE party_code = ? AND guest_id = ? AND status != 'source' ORDER BY created_at DESC LIMIT 50", code, guestID)
 }
 
-// GuestBusy reports whether the guest already has a job in flight (limit 1 per guest).
+// GuestBusy reports whether the guest already has a job in flight (limit 1 per
+// guest). Only what the guest started counts: a living loop the operator ordered
+// for their photo must not block them.
 func (s *Store) GuestBusy(ctx context.Context, code, guestID string) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets WHERE party_code = ? AND guest_id = ? AND status = 'processing'", code, guestID).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets WHERE party_code = ? AND guest_id = ? AND status = 'processing' AND kind IN ('restyle', 'dance')", code, guestID).Scan(&n)
 	return n > 0, err
 }
 
@@ -355,7 +365,12 @@ func (s *Store) SetAssetStatus(ctx context.Context, code, id, status string) err
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	if status == "approved" {
+	var kind string
+	if err := tx.QueryRowContext(ctx, "SELECT kind FROM assets WHERE id = ?", id).Scan(&kind); err != nil {
+		return err
+	}
+	// a live loop is shown in place of its photo, never as its own queue item
+	if status == "approved" && kind != "live" {
 		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO stage_queue(asset_id, party_code, position)
 			VALUES(?, ?, COALESCE((SELECT MAX(position) FROM stage_queue WHERE party_code = ?), 0) + 1)`, id, code, code)
 	} else {
@@ -370,8 +385,30 @@ func (s *Store) SetAssetStatus(ctx context.Context, code, id, status string) err
 // ── stage queue ────────────────────────────────────────────────────────────
 
 func (s *Store) StageQueue(ctx context.Context, code string) ([]Asset, error) {
-	return s.queryAssets(ctx, "SELECT a."+strings.ReplaceAll(assetCols, ", ", ", a.")+
-		" FROM stage_queue q JOIN assets a ON a.id = q.asset_id WHERE q.party_code = ? ORDER BY q.position", code)
+	rows, err := s.db.QueryContext(ctx, "SELECT a."+strings.ReplaceAll(assetCols, ", ", ", a.")+`,
+		COALESCE((SELECT l.file FROM assets l WHERE l.src_id = a.id AND l.kind = 'live' AND l.status = 'approved'
+		          ORDER BY l.created_at DESC LIMIT 1), '')
+		FROM stage_queue q JOIN assets a ON a.id = q.asset_id WHERE q.party_code = ? ORDER BY q.position`, code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Asset{}
+	for rows.Next() {
+		var a Asset
+		var meta string
+		if err := rows.Scan(&a.ID, &a.PartyCode, &a.GuestID, &a.Kind, &a.SrcID, &a.File, &meta, &a.NSFWScore, &a.Status, &a.CreatedAt, &a.Live); err != nil {
+			return nil, err
+		}
+		a.Meta = json.RawMessage(meta)
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// AnimationOf returns the newest live/dance asset made from src (any status).
+func (s *Store) AnimationOf(ctx context.Context, srcID, kind string) (Asset, error) {
+	return scanAsset(s.db.QueryRowContext(ctx, "SELECT "+assetCols+" FROM assets WHERE src_id = ? AND kind = ? AND status NOT IN ('failed', 'rejected') ORDER BY created_at DESC LIMIT 1", srcID, kind))
 }
 
 // ReorderQueue rewrites positions in the given order; ids not listed keep their

@@ -140,12 +140,19 @@ type RestylerBackend struct {
 func (r *RestylerBackend) Name() string { return "restyler" }
 
 func (r *RestylerBackend) Restyle(ctx context.Context, req RestyleRequest) ([]byte, string, error) {
+	return r.render(ctx, req.Photo, map[string]any{
+		"id": "style", "graph": "restyle_flux", "input": "source",
+		"prompt": req.Prompt, "negative": req.Negative,
+	})
+}
+
+// render runs a one-step /api/render job and returns that step's output
+// (PNG for image graphs, mp4 for live_portrait / wan_motion).
+func (r *RestylerBackend) render(ctx context.Context, source []byte, step map[string]any) ([]byte, string, error) {
+	id, _ := step["id"].(string)
 	body := map[string]any{
-		"source": base64.StdEncoding.EncodeToString(req.Photo),
-		"steps": []map[string]any{{
-			"id": "style", "graph": "restyle_flux", "input": "source",
-			"prompt": req.Prompt, "negative": req.Negative,
-		}},
+		"source": base64.StdEncoding.EncodeToString(source),
+		"steps":  []map[string]any{step},
 	}
 	var job struct {
 		JobID string `json:"job_id"`
@@ -175,14 +182,14 @@ func (r *RestylerBackend) Restyle(ctx context.Context, req RestyleRequest) ([]by
 		// status decides the end of a job, not done/total (Restyler CLAUDE.md).
 		switch st.Status {
 		case "done":
-			if s := st.Steps["style"]; s.Status != "done" {
+			if s := st.Steps[id]; s.Status != "done" {
 				return nil, job.JobID, fmt.Errorf("restyler step %s: %s", s.Status, s.Error)
 			}
-			var png []byte
-			if err := doJSON(ctx, r.Auth, "GET", r.URL+"/api/jobs/"+job.JobID+"/step/style", nil, &png); err != nil {
+			var out []byte
+			if err := doJSON(ctx, r.Auth, "GET", r.URL+"/api/jobs/"+job.JobID+"/step/"+id, nil, &out); err != nil {
 				return nil, job.JobID, fmt.Errorf("restyler output: %w", err)
 			}
-			return png, job.JobID, nil
+			return out, job.JobID, nil
 		case "error":
 			return nil, job.JobID, fmt.Errorf("restyler job: %s", st.Error)
 		}

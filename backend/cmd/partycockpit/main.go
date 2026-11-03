@@ -60,6 +60,17 @@ func run() error {
 	default:
 		restyler = &providers.Mock{Delay: 3 * time.Second}
 	}
+	var animator providers.Animator
+	switch cfg.AnimateProvider {
+	case "comfy":
+		animator = &providers.Comfy{URL: cfg.ComfyURL, DriverDir: cfg.DriverDir}
+	case "restyler":
+		a := cf
+		a.Extra = map[string]string{"Authorization": "app " + cfg.RestylerToken, "X-User": cfg.RestylerUser}
+		animator = providers.RestylerAnimator{R: &providers.RestylerBackend{URL: cfg.RestylerURL, Auth: a}}
+	default:
+		animator = providers.MockAnimator{Delay: 4 * time.Second}
+	}
 	var classifier providers.Classifier = providers.NoClassifier{}
 	if cfg.Moderation == "aistack" {
 		classifier = &providers.WD14{URL: cfg.AiStackURL, Auth: aistack}
@@ -70,7 +81,7 @@ func run() error {
 		Gallery:  gallery.New(cfg.GalleryURL, filepath.Join(cfg.DataDir, "gallery-cache"), cfg.GalleryAllowUnclassified, cf.Headers()),
 		DJfy:     djfy.New(cfg.DJfyURL),
 		Catalog:  cat,
-		Restyler: restyler, Classifier: classifier,
+		Restyler: restyler, Animator: animator, Classifier: classifier,
 		Web: web.FS(),
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -89,7 +100,7 @@ func run() error {
 		defer cancel()
 		hs.Shutdown(sctx)
 	}()
-	slog.Info("partycockpit listening", "addr", cfg.Addr, "public", cfg.PublicURL, "restyle", restyler.Name(), "moderation", cfg.Moderation, "web", srv.Web != nil)
+	slog.Info("partycockpit listening", "addr", cfg.Addr, "public", cfg.PublicURL, "restyle", restyler.Name(), "animate", animator.Name(), "moderation", cfg.Moderation, "web", srv.Web != nil)
 	if cfg.TLSCert != "" {
 		ts := &http.Server{Addr: cfg.TLSAddr, Handler: hs.Handler, ReadHeaderTimeout: 10 * time.Second}
 		go func() {

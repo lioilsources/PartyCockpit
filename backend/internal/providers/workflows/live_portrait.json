@@ -1,0 +1,148 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Photo (template from MangaPrompts feat/restyler, UNVERIFIED until validated on the GPU host)"
+    },
+    "inputs": {
+      "image": "__IMAGE__",
+      "upload": "image"
+    }
+  },
+  "2": {
+    "class_type": "DownloadAndLoadLivePortraitModels",
+    "_meta": {
+      "title": "LivePortrait models"
+    },
+    "inputs": {
+      "precision": "auto",
+      "mode": "human"
+    }
+  },
+  "3": {
+    "class_type": "LivePortraitLoadCropper",
+    "_meta": {
+      "title": "InsightFace cropper"
+    },
+    "inputs": {
+      "onnx_device": "CPU",
+      "keep_model_loaded": true,
+      "detection_threshold": 0.5
+    }
+  },
+  "4": {
+    "class_type": "LivePortraitCropper",
+    "_meta": {
+      "title": "Crop the face"
+    },
+    "inputs": {
+      "pipeline": [
+        "2",
+        0
+      ],
+      "cropper": [
+        "3",
+        0
+      ],
+      "source_image": [
+        "1",
+        0
+      ],
+      "dsize": 512,
+      "scale": 2.3,
+      "vx_ratio": 0.0,
+      "vy_ratio": -0.125,
+      "face_index": 0,
+      "face_index_order": "large-small",
+      "rotate": true
+    }
+  },
+  "5": {
+    "class_type": "VHS_LoadVideo",
+    "_meta": {
+      "title": "Driver clip"
+    },
+    "inputs": {
+      "video": "__DRIVER__",
+      "force_rate": 25,
+      "custom_width": 0,
+      "custom_height": 0,
+      "frame_load_cap": 0,
+      "skip_first_frames": 0,
+      "select_every_nth": 1
+    }
+  },
+  "6": {
+    "class_type": "LivePortraitProcess",
+    "_meta": {
+      "title": "Move the face"
+    },
+    "inputs": {
+      "pipeline": [
+        "2",
+        0
+      ],
+      "crop_info": [
+        "4",
+        1
+      ],
+      "source_image": [
+        "1",
+        0
+      ],
+      "driving_images": [
+        "5",
+        0
+      ],
+      "lip_zero": false,
+      "lip_zero_threshold": 0.03,
+      "stitching": true,
+      "delta_multiplier": 1.0,
+      "mismatch_method": "constant",
+      "relative_motion_mode": "relative",
+      "driving_smooth_observation_variance": 3e-06
+    }
+  },
+  "7": {
+    "class_type": "LivePortraitComposite",
+    "_meta": {
+      "title": "Back into the photo"
+    },
+    "inputs": {
+      "source_image": [
+        "1",
+        0
+      ],
+      "cropped_image": [
+        "6",
+        0
+      ],
+      "liveportrait_out": [
+        "6",
+        1
+      ]
+    }
+  },
+  "8": {
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Save mp4"
+    },
+    "inputs": {
+      "images": [
+        "7",
+        0
+      ],
+      "frame_rate": 25,
+      "loop_count": 0,
+      "filename_prefix": "partycockpit_live",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": false,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true
+    }
+  }
+}

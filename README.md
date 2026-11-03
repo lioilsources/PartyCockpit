@@ -23,6 +23,8 @@ Mac Mini, Windows mini PC nebo domácí server.
 - **Now playing**: skladba a fronta z DJfy s hlasy.
 - **Webtoon**: předpřipravené epizody s auto-scrollem.
 - **Losování**: kdo hraje o přestávce.
+- **Tančírna**: hosté tančí na plátně. Telefon → „Roztanči mě“ → Wan na GPU → schválení.
+- **Živé portréty**: fotky v galerii mrkají a rozhlížejí se (LivePortrait).
 - **Živě**: mřížka živých kamer z telefonů (prohlížeč nebo MirrorBooth) až 3×3, po schválení operátorem.
 - **Mezihra**.
 
@@ -49,6 +51,7 @@ Docker: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --bui
 | Restyler backend | restyle selfie (`restyle_flux`, drží obličej) | `RESTYLE_PROVIDER=restyler`, `RESTYLER_*` |
 | AiStack | záloha restyle (flux-kontext), NSFW tagger (WD14) | `AISTACK_URL`, `MODERATION=aistack` |
 | FineTuneGallery | obrázky do slideshow | `FINETUNE_URL` |
+| ComfyUI (L40S) | živé portréty (LivePortrait) a tanec (Wan 2.2 I2V) | `ANIMATE_PROVIDER=comfy`, `COMFY_URL` |
 | DJfy | now playing, sdílená fronta, hlasování, BPM | `DJFY_URL` + v Cockpitu kód DJfy party |
 
 Hosty za Cloudflare Access ověřuje `CF_ACCESS_CLIENT_ID/SECRET`.

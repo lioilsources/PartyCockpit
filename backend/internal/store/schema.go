@@ -25,7 +25,7 @@ CREATE TABLE guests (
 );
 CREATE INDEX guests_party ON guests(party_code);
 
--- kind: upload | restyle | sticker
+-- kind: upload | restyle | sticker  (+ live | dance since M4, src_id = the animated photo)
 -- status: processing | pending | approved | rejected | failed | source
 CREATE TABLE assets (
   id          TEXT PRIMARY KEY,
@@ -78,4 +78,6 @@ CREATE TABLE ideas (
   created_at INTEGER NOT NULL
 );
 `,
+	// 2 — M4: animate approved photos automatically (LivePortrait loop per photo)
+	`ALTER TABLE parties ADD COLUMN auto_live INTEGER NOT NULL DEFAULT 0;`,
 }

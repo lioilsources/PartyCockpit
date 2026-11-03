@@ -46,6 +46,13 @@ type Config struct {
 	CFClientID      string // CF_ACCESS_CLIENT_ID (shared by Restyler and AiStack hosts)
 	CFClientSecret  string // CF_ACCESS_CLIENT_SECRET
 
+	// Animation provider (M4): "comfy" (ComfyUI host, e.g. the L40S via tunnel),
+	// "restyler" (Restyler live_portrait; no dances) or "mock" (animated GIF).
+	AnimateProvider string // ANIMATE_PROVIDER
+	ComfyURL        string // COMFY_URL
+	DriverDir       string // PC_DRIVER_DIR, LivePortrait driver clips <motion>.mp4 to upload
+	AnimWorkers     int    // PC_ANIM_WORKERS
+
 	// Moderation classifier: "none" (everything waits for the operator) or "aistack" (WD14 tagger).
 	Moderation     string  // MODERATION
 	AutoApproveMax float64 // SFW_AUTO_APPROVE_MAX, NSFW score at or below which relaxed mode auto-approves
@@ -74,6 +81,10 @@ func Load() Config {
 		AiStackProject:           env("AISTACK_PROJECT", "partycockpit"),
 		CFClientID:               env("CF_ACCESS_CLIENT_ID", ""),
 		CFClientSecret:           env("CF_ACCESS_CLIENT_SECRET", ""),
+		AnimateProvider:          env("ANIMATE_PROVIDER", "mock"),
+		ComfyURL:                 strings.TrimRight(env("COMFY_URL", "http://127.0.0.1:8188"), "/"),
+		DriverDir:                env("PC_DRIVER_DIR", ""),
+		AnimWorkers:              num("PC_ANIM_WORKERS", 1),
 		Moderation:               env("MODERATION", "none"),
 		AutoApproveMax:           flt("SFW_AUTO_APPROVE_MAX", 0.15),
 	}

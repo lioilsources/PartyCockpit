@@ -101,3 +101,25 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
   `--disable-features=WebRtcHideLocalIpsWithMdns`.
 - **MirrorBooth** dělá vlastní session podle `docs/mirrorbooth-stream.md`. Klíčový úkol je
   dostat do WebRTC výstup shaderu, protože dnes posílá surovou kameru.
+
+## D13: M4 živé portréty a tanec hostů (2026-11-03)
+- **GPU jede na L40S** (pokyn uživatele 2026-11-03: „GPU jed pres @L40S“). PartyCockpit
+  posílá úlohy přímo do ComfyUI (`ANIMATE_PROVIDER=comfy`, `COMFY_URL`). Restyler
+  `live_portrait`/`wan_motion` je zatím jen na nemergnuté větvi a nikdy neběžel, proto
+  je jen jako druhá cesta (`ANIMATE_PROVIDER=restyler`, umí jen živý portrét).
+  Offline se používá `mock` (animovaný GIF).
+- **Živý portrét** (LivePortrait, driver `alive`: mrknutí, pohled kolem, úsměv) jen
+  pohne obličejem na fotce, kterou operátor už schválil. Proto **dědí schválení**
+  a hraje v galerii místo statické fotky (`Asset.live`). Jako samostatná položka se do
+  show fronty nedostane. Zapíná se v Cockpitu („oživovat schválené fotky“) nebo
+  jednorázově tlačítkem „✨ Oživit galerii“.
+- **Tanec** (Wan 2.2 I2V, 4 předvolby) je generativní, takže vždy čeká na operátora,
+  ani v relaxed režimu se automaticky neschvaluje. Po schválení jde do show fronty
+  a hraje ve scéně „💃 Tančírna“ (až 4 vedle sebe, rychlost videa podle tempa ±10 %).
+- Animace mají vlastní worker (`PC_ANIM_WORKERS=1`), takže tanec nezdrží restyle.
+  Do limitu „1 rozpracovaný úkol na hosta“ se počítá jen to, co host spustil sám.
+- **Soukromí:** fotky hostů jdou na L40S (T-Mobile sandbox, není náš stroj). ComfyUI
+  tam poslouchá jen na 127.0.0.1 a je dostupné přes VPN a SSH tunel. Party box mimo
+  domov potřebuje OpenVPN profil a tunel.
+- **Cropper** pro LivePortrait je MediaPipe (Apache 2.0). InsightFace je nekomerční
+  a PartyCockpit může být B2B (D10).

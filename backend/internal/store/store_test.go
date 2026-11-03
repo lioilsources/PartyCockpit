@@ -118,3 +118,26 @@ func equal(a, b []string) bool {
 	}
 	return true
 }
+
+func TestLiveLoopsDoNotBlockTheGuestNorJoinTheQueue(t *testing.T) {
+	s := open(t)
+	ctx := context.Background()
+	p, _ := s.CreateParty(ctx, "x", time.Hour)
+	g, _ := s.CreateGuest(ctx, p.Code, "g")
+	photo, _ := s.CreateAsset(ctx, Asset{PartyCode: p.Code, GuestID: g.ID, Kind: "restyle", File: "a.png", Status: "pending"})
+	if err := s.SetAssetStatus(ctx, p.Code, photo.ID, "approved"); err != nil {
+		t.Fatal(err)
+	}
+	live, _ := s.CreateAsset(ctx, Asset{PartyCode: p.Code, GuestID: g.ID, Kind: "live", SrcID: photo.ID, Status: "processing"})
+	if busy, _ := s.GuestBusy(ctx, p.Code, g.ID); busy {
+		t.Fatal("an operator-ordered living loop must not make the guest busy")
+	}
+	s.SetAssetResult(ctx, live.ID, "l.mp4", "pending", -1, nil)
+	if err := s.SetAssetStatus(ctx, p.Code, live.ID, "approved"); err != nil {
+		t.Fatal(err)
+	}
+	q, _ := s.StageQueue(ctx, p.Code)
+	if len(q) != 1 || q[0].ID != photo.ID || q[0].Live != "l.mp4" {
+		t.Fatalf("queue = %+v, want the photo with its loop attached", q)
+	}
+}

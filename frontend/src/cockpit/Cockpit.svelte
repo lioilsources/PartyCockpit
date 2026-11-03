@@ -5,6 +5,7 @@
   import { TapTempo } from '../lib/beat';
   import { Viewer, srcObject, type RtcMsg } from '../lib/rtc';
   import { fileUrl, type Asset, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type Tempo } from '../lib/types';
+  import Clip from '../lib/Clip.svelte';
 
   let { code }: { code: string } = $props();
 
@@ -108,6 +109,7 @@
     { kind: 'webtoon', label: '📖 Webtoon' },
     { kind: 'lottery', label: '🎲 Losování' },
     { kind: 'pipwall', label: '📡 Živě (streamy)' },
+    { kind: 'dance', label: '💃 Tančírna' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
   let slideStyle = $state('');
@@ -125,7 +127,8 @@
 
   // ── moderation
   const pending = $derived((st?.assets ?? []).filter((a) => a.status === 'pending'));
-  const processing = $derived((st?.assets ?? []).filter((a) => a.status === 'processing'));
+  const processing = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind !== 'live'));
+  const animating = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind === 'live'));
   const failed = $derived((st?.assets ?? []).filter((a) => a.status === 'failed'));
   const rejected = $derived((st?.assets ?? []).filter((a) => a.status === 'rejected').slice(0, 12));
 
@@ -192,7 +195,7 @@
         <h1>{party.name} <code>{party.code}</code></h1>
         <span class="dot" class:on={online}></span>
         <span class="muted">
-          plátno {st?.clients?.stage ?? 0} · hosté {st?.guests.length ?? 0} (online {st?.clients?.guest ?? 0}) · restyle: {st?.config.restyle}
+          plátno {st?.clients?.stage ?? 0} · hosté {st?.guests.length ?? 0} (online {st?.clients?.guest ?? 0}) · restyle: {st?.config.restyle} · animace: {st?.config.animate}
         </span>
       </div>
       <div class="links">
@@ -246,10 +249,11 @@
               {#if a.kind === 'sticker'}
                 <div class="sticker" style:background={a.meta.color}>{a.meta.text}</div>
               {:else}
-                <img src={fileUrl(code, a.file)} alt="" />
+                <Clip src={fileUrl(code, a.file)} />
               {/if}
               <div class="meta">
                 <strong>{a.meta.nickname}</strong>
+                {#if a.kind === 'dance'}<span>💃 tanec {a.meta.motionLabel}</span>{/if}
                 {#if a.meta.styleLabel}<span>{a.meta.styleLabel}</span>{/if}
                 {#if a.meta.fallback}<span class="warn">originál (restyle selhal)</span>{/if}
                 {#if a.nsfwScore >= 0}<span class:warn={a.nsfwScore > 0.15}>NSFW {a.nsfwScore.toFixed(2)}</span>{/if}
@@ -285,6 +289,11 @@
       <section>
         <h2>Show fronta ({queue.length})</h2>
         <div class="row small">
+          <label><input type="checkbox" checked={party.autoLive} onchange={(e) => patch({ autoLive: e.currentTarget.checked })} /> oživovat schválené fotky</label>
+          <button onclick={() => act(async () => { const r = await api.post<{ queued: number }>(p('/animate'), {}, token); err = r.queued ? '' : 'všechny fotky už živé jsou (nebo se oživují)'; })}>✨ Oživit galerii</button>
+          {#if animating.length}<span class="muted">oživuje se {animating.length}</span>{/if}
+        </div>
+        <div class="row small">
           <span class="muted">po doběhnutí:</span>
           <button class:on={party.loopMode === 'loop'} onclick={() => patch({ loopMode: 'loop' })}>od začátku</button>
           <button class:on={party.loopMode === 'shuffle'} onclick={() => patch({ loopMode: 'shuffle' })}>shuffle</button>
@@ -292,8 +301,8 @@
         <ol class="queue">
           {#each queue as a, i (a.id)}
             <li>
-              {#if a.kind === 'sticker'}<span class="qs" style:background={a.meta.color}>✍️</span>{:else}<img src={fileUrl(code, a.file)} alt="" />{/if}
-              <span class="qn">{a.meta.nickname} · {a.kind === 'sticker' ? a.meta.text : a.meta.styleLabel}</span>
+              {#if a.kind === 'sticker'}<span class="qs" style:background={a.meta.color}>✍️</span>{:else}<Clip src={fileUrl(code, a.live ?? a.file)} />{/if}
+              <span class="qn">{a.meta.nickname} · {a.kind === 'sticker' ? a.meta.text : a.kind === 'dance' ? `💃 ${a.meta.motionLabel}` : a.meta.styleLabel}{a.live ? ' · ✨ živá' : ''}</span>
               <button onclick={() => move(i, -1)}>↑</button>
               <button onclick={() => move(i, 1)}>↓</button>
               <button class="bad" onclick={() => act(() => api.del(p(`/queue/${a.id}`), token))}>✕</button>
@@ -495,13 +504,14 @@
     display: grid;
     gap: 6px;
   }
-  .card img {
+  .card :global(img),
+  .card :global(video) {
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
     border-radius: 8px;
   }
-  .card.mini img {
+  .card.mini :global(img) {
     aspect-ratio: 1;
   }
   .sticker {
@@ -535,7 +545,8 @@
     align-items: center;
     gap: 8px;
   }
-  .queue img,
+  .queue :global(img),
+  .queue :global(video),
   .qs {
     width: 40px;
     height: 40px;

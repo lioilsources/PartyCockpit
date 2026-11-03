@@ -114,6 +114,7 @@ func (s *Server) finishAsset(ctx context.Context, code, assetID, file string, im
 	if allowAuto && p.Mode == "relaxed" && score >= 0 && score <= s.Cfg.AutoApproveMax {
 		if err := s.Store.SetAssetStatus(ctx, code, assetID, "approved"); err == nil {
 			s.pushQueue(ctx, code)
+			s.onApproved(ctx, p, assetID)
 		}
 	}
 	s.pushCockpit(ctx, p)
@@ -125,6 +126,10 @@ func (s *Server) finishAsset(ctx context.Context, code, assetID, file string, im
 func (s *Server) fallbackToOriginal(ctx context.Context, assetID, reason string) {
 	a, err := s.Store.AssetByID(ctx, assetID)
 	if err != nil {
+		return
+	}
+	if a.Kind == "live" || a.Kind == "dance" {
+		s.failAnimation(ctx, assetID, reason)
 		return
 	}
 	var m map[string]any
