@@ -1,0 +1,81 @@
+# DECISIONS.md
+
+Rozhodnutí k `Prompts/00-PARTYKOKPIT_PLAN.md` §10 (odpovědi Olina 2026-11-03) a co z nich
+plyne pro implementaci. Pozdější rozhodnutí přidávej na konec s datem.
+
+## D1 — Frontend stack: Svelte 5 + Vite + PixiJS / Three.js
+Jedna SPA (`frontend/`), tři role podle cesty: `/stage`, `/cockpit`, `/join/<code>`.
+PixiJS pro 2D scény (slideshow, galerie, stickery, emoji), Three.js až pro 3D hry/tanečníky.
+Žádný SvelteKit — build je statický a Go binárka ho embeduje (`backend/web/dist`).
+
+## D2 — Party je vždy on-site (LAN)
+- Žádný TURN / Cloudflare Calls. WebRTC (LiveKit, M3) jen na LAN.
+- QR na plátně vede na **LAN URL** (`PC_PUBLIC_URL`, např. `http://<LAN-IP-party-boxu>:8098`).
+- Protože party nemusí být u JODA, backend je **jedna přenosná Go binárka** s vestavěným
+  frontendem a **SQLite** (pure-Go `modernc.org/sqlite`, bez CGO) místo Postgres — pustí se
+  na JODA (Compose) i na Mac Mini / Windows mini PC na místě. Odchylka od plánu §4 (Postgres).
+- GPU joby jdou na Spark přes síť (AiStack/ComfyUI); když Spark není dosažitelný, providery
+  spadnou do `failed` a host vidí originál.
+
+## D3 — DJfy: existující HTTP endpoint (na JODA, s QR)
+PartyCockpit DJfy nepřehrává, jen čte now-playing/frontu a přidává do ní. Adapter
+`backend/internal/djfy` mluví s existujícím DJfy serverem (`DJFY_URL`). Viz poznámky
+k reálným endpointům v `backend/internal/djfy/client.go`.
+
+## D4 — Audio výstup: Apple TV / Mac Mini / Windows mini PC (HDMI)
+- Stage běží v prohlížeči na Mac Mini nebo Windows mini PC (HDMI do TV). Apple TV nemá
+  prohlížeč → jen jako AirPlay cíl z Macu.
+- Beat: (1) BPM z DJfy metadat, pokud je; (2) Web Audio z audio vstupu Stage stroje
+  (BlackHole na Macu, VB-Cable/Stereo Mix na Windows, nebo mikrofon když hraje Apple TV);
+  (3) **tap tempo** v Cockpitu. Stage si vybírá to nejlepší dostupné.
+
+## D5 — Moderace: pre-play approval + smyčková fronta
+- Vše od hostů → `pending` → operátor schválí → asset jde do **show fronty** (`stage_queue`).
+- Stage hraje frontu postupně; když doběhne, **rotuje od začátku** nebo **shuffle**
+  (`parties.loop_mode = 'loop'|'shuffle'`). Olin tedy schválí várku a jde tancovat.
+- Nic se nedostane na plátno bez schválení. `relaxed` (auto-approve pod SFW prahem) je
+  implementovaný, ale default je `strict`; práh `SFW_AUTO_APPROVE_MAX=0.15` (NSFW skóre 0–1),
+  použije se jen když běží reálný klasifikátor.
+- Panic tlačítko v Cockpitu = okamžitý skok na Slideshow + vyčištění overlaye.
+
+## D6 — 3D / hry o přestávce (zatím ne priorita)
+- Hráče vybírá **losování** z hostů, kteří se přihlásili („chci hrát“); los umí N hráčů
+  (co-op, např. Kiriana). Implementováno jako scéna `Lottery` + API; samotné hry později.
+
+## D7 — Webtoon: hotové divadelní hry + náměty od hostů
+- Scéna `Webtoon` přehrává předpřipravené epizody (auto-scroll).
+- Hosté posílají **náměty** (`ideas`) z telefonu; Cockpit je vidí a exportuje (JSON) jako
+  vstup pro pozdější stripy. Živá generace epizody na party se nedělá.
+
+## D8 — Repo: `PartyCockpit`, veřejné na GitHubu
+- Žádná tajemství v repu: vše přes env (`.env.example`), žádné interní hostname natvrdo
+  kromě defaultů v příkladech. Licence MIT.
+
+## D9 — Hardware plátna: prohlížeč na Mac Mini / Windows mini PC (viz D4)
+Three.js scény zůstávají ve hře. Kiosk: Chrome `--kiosk`, bez kurzoru.
+
+## D10 — Monetizace
+Odpověď: „B2B služba nebude to Ol1nPass mobilní appka“. **Výklad k potvrzení:** party jako
+B2B služba se počítá, ale ne přes Ol1nPass mobilní appku. Dopad na kód teď: `parties` jsou
+multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass integrace se nedělá.
+
+## D11 — Implementace M0–M2 (2026-11-03)
+- **Port 8098**: 8097 drží `djfy-relay` (a `finetune-wd14` na SPARKu).
+- **Restyle = Restyler backend** (`RESTYLE_PROVIDER=restyler`): `POST /api/render` s jedním
+  krokem `restyle_flux` (drží identitu obličeje), prompt = medium věta + blok stylu přesně
+  jako Restyler (`restylePrompt`). Katalog 90 stylů je převzatý z Restyleru
+  (`make styles` ho přegeneruje). Záloha: AiStack flux-kontext (`kontext`), offline `mock`.
+- **Když restyle selže**, host vidí originál a Cockpit dostane originál ke schválení —
+  nikdy se neschvaluje automaticky, ani v `relaxed`.
+- **DJfy**: relay nemá REST frontu, PartyCockpit se k ní připojuje jako host přes SSE
+  (`/events?guest=`) a zprávy (`/messages`). Každý host PartyCockpitu má v DJfy vlastní
+  `guestId`, takže platí limity DJfy na hosta. Hledání jde přes telefon s DJfy (relay
+  SoundCloud nevolá) — když je telefon offline, hledání nejde.
+- **Tempo**: tap tempo v Cockpitu > BPM z DJfy `nowPlaying.bpm` > audio vstup Stage
+  (`/stage/<code>?audio=1`) > 60 bpm idle.
+- **Sticker Wall**: HandWrittenStickers nemá HTTP API → vzkazy se kreslí fontem Caveat.
+  Napojení na glyph extraktor je samostatný úkol.
+- **FineTuneGallery** je za Cloudflare Access: backend posílá `CF_ACCESS_CLIENT_*`;
+  service token musí být povolený v Access aplikaci finetune. Slideshow bere jen
+  `taxo.band == "safe"` (bez taxonomie nic, pokud není `FINETUNE_ALLOW_UNCLASSIFIED=1`).
+- **Webtoon** epizody = složky `data/webtoon/<id>/` s panely v pořadí názvů + `title.txt`.

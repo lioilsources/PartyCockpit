@@ -1,0 +1,581 @@
+package api
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/big"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/lioilsources/PartyCockpit/backend/internal/gallery"
+	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
+	"github.com/lioilsources/PartyCockpit/backend/internal/store"
+)
+
+// ── parties ────────────────────────────────────────────────────────────────
+
+func (s *Server) createParty(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Name string `json:"name"`
+	}
+	readJSON(r, &in)
+	name := clean(in.Name, 60)
+	if name == "" {
+		name = "Party"
+	}
+	p, err := s.Store.CreateParty(r.Context(), name, s.Cfg.PartyTTL)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	pub, _ := s.publicParty(r, p)
+	writeJSON(w, 201, map[string]any{"party": pub, "cockpitToken": p.CockpitToken})
+}
+
+func (s *Server) listParties(w http.ResponseWriter, r *http.Request) {
+	ps, err := s.Store.Parties(r.Context())
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	type row struct {
+		store.Party
+		CockpitToken string `json:"cockpitToken"`
+	}
+	out := []row{}
+	for _, p := range ps {
+		out = append(out, row{p, p.CockpitToken})
+	}
+	writeJSON(w, 200, out)
+}
+
+type PublicParty struct {
+	store.Party
+	JoinURL string      `json:"joinUrl"`
+	Scene   store.Scene `json:"scene"`
+	Clients any         `json:"clients"`
+}
+
+func (s *Server) joinURL(r *http.Request, code string) string {
+	base := s.Cfg.PublicURL
+	if base == "" {
+		scheme := "http"
+		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		base = scheme + "://" + r.Host
+	}
+	return base + "/join/" + code
+}
+
+func (s *Server) publicParty(r *http.Request, p store.Party) (PublicParty, error) {
+	sc, err := s.Store.Scene(r.Context(), p.Code)
+	return PublicParty{Party: p, JoinURL: s.joinURL(r, p.Code), Scene: sc, Clients: s.Hub.Counts(p.Code)}, err
+}
+
+func (s *Server) getParty(w http.ResponseWriter, r *http.Request, p store.Party) {
+	pub, err := s.publicParty(r, p)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, pub)
+}
+
+func (s *Server) broadcastParty(r *http.Request, code string) {
+	p, err := s.Store.Party(r.Context(), code)
+	if err != nil {
+		return
+	}
+	if pub, err := s.publicParty(r, p); err == nil {
+		s.Hub.Broadcast(code, hub.Msg{Type: "party", Data: pub})
+	}
+}
+
+func (s *Server) patchParty(w http.ResponseWriter, r *http.Request, p store.Party) {
+	var in store.PartyPatch
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	if in.Mode != nil && *in.Mode != "strict" && *in.Mode != "relaxed" {
+		writeErr(w, 400, "mode: strict|relaxed")
+		return
+	}
+	if in.LoopMode != nil && *in.LoopMode != "loop" && *in.LoopMode != "shuffle" {
+		writeErr(w, 400, "loopMode: loop|shuffle")
+		return
+	}
+	if in.Name != nil {
+		n := clean(*in.Name, 60)
+		in.Name = &n
+	}
+	if in.DJfyCode != nil {
+		c := strings.ToUpper(strings.TrimSpace(*in.DJfyCode))
+		if c != "" && !djfyCodeRE.MatchString(c) {
+			writeErr(w, 400, "neplatný DJfy kód")
+			return
+		}
+		in.DJfyCode = &c
+	}
+	if err := s.Store.UpdateParty(r.Context(), p.Code, in); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if in.DJfyCode != nil {
+		s.DJfy.Watch(p.Code, *in.DJfyCode)
+		if *in.DJfyCode == "" {
+			s.onDJfySnapshot(p.Code, nil)
+		}
+	}
+	s.broadcastParty(r, p.Code)
+	w.WriteHeader(204)
+}
+
+var djfyCodeRE = regexp.MustCompile(`^[A-Z0-9]{3,12}$`)
+
+// ── guests ─────────────────────────────────────────────────────────────────
+
+func (s *Server) createGuest(w http.ResponseWriter, r *http.Request, p store.Party) {
+	var in struct {
+		Nickname string `json:"nickname"`
+	}
+	readJSON(r, &in)
+	nick := clean(in.Nickname, 24)
+	if nick == "" {
+		writeErr(w, 400, "zadej přezdívku")
+		return
+	}
+	g, err := s.Store.CreateGuest(r.Context(), p.Code, nick)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.pushCockpit(r.Context(), p)
+	writeJSON(w, 201, g)
+}
+
+func (s *Server) setPlay(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	var in struct {
+		Wants bool `json:"wants"`
+	}
+	readJSON(r, &in)
+	if err := s.Store.SetWantsToPlay(r.Context(), p.Code, g.ID, in.Wants); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.pushCockpit(r.Context(), p)
+	w.WriteHeader(204)
+}
+
+func (s *Server) guestAssets(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	as, err := s.Store.GuestAssets(r.Context(), p.Code, g.ID)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"guest": g, "assets": as})
+}
+
+func (s *Server) uploadPhoto(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	ctx := r.Context()
+	if busy, _ := s.Store.GuestBusy(ctx, p.Code, g.ID); busy {
+		writeErr(w, 429, "počkej, tvoje předchozí fotka se ještě maluje")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 15<<20)
+	if err := r.ParseMultipartForm(15 << 20); err != nil {
+		writeErr(w, 400, "fotka je moc velká nebo chybí")
+		return
+	}
+	f, _, err := r.FormFile("photo")
+	if err != nil {
+		writeErr(w, 400, "chybí fotka")
+		return
+	}
+	raw, err := io.ReadAll(f)
+	f.Close()
+	if err != nil {
+		writeErr(w, 400, "chyba při čtení fotky")
+		return
+	}
+	style, ok := s.Catalog.Style(r.FormValue("style"))
+	if !ok {
+		writeErr(w, 400, "neznámý styl")
+		return
+	}
+	medium := r.FormValue("medium")
+	a, err := s.submitRestyle(ctx, p, g, raw, style, medium)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	writeJSON(w, 202, a)
+}
+
+func (s *Server) createSticker(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	var in struct {
+		Text  string `json:"text"`
+		Color string `json:"color"`
+	}
+	readJSON(r, &in)
+	text := clean(in.Text, 140)
+	if text == "" {
+		writeErr(w, 400, "napiš vzkaz")
+		return
+	}
+	if !colorRE.MatchString(in.Color) {
+		in.Color = "#ffd84d"
+	}
+	meta, _ := json.Marshal(map[string]string{"text": text, "nickname": g.Nickname, "color": in.Color})
+	a, err := s.Store.CreateAsset(r.Context(), store.Asset{PartyCode: p.Code, GuestID: g.ID, Kind: "sticker", Meta: meta, Status: "pending"})
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.pushCockpit(r.Context(), p)
+	writeJSON(w, 201, a)
+}
+
+var colorRE = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+func (s *Server) createIdea(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	var in struct {
+		Text string `json:"text"`
+	}
+	readJSON(r, &in)
+	text := clean(in.Text, 1000)
+	if utf8.RuneCountInString(text) < 5 {
+		writeErr(w, 400, "námět je moc krátký")
+		return
+	}
+	i, err := s.Store.CreateIdea(r.Context(), p.Code, g, text)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.pushCockpit(r.Context(), p)
+	writeJSON(w, 201, i)
+}
+
+var emojis = map[string]bool{"❤️": true, "🔥": true, "😂": true, "🎉": true, "👏": true, "😍": true, "🕺": true, "💃": true, "🍍": true, "🍌": true}
+
+func (s *Server) react(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+	var in struct {
+		Emoji string `json:"emoji"`
+	}
+	readJSON(r, &in)
+	if !emojis[in.Emoji] {
+		writeErr(w, 400, "neznámé emoji")
+		return
+	}
+	s.mu.Lock()
+	last := s.lastReact[g.ID]
+	ok := time.Since(last) > 700*time.Millisecond
+	if ok {
+		s.lastReact[g.ID] = time.Now()
+	}
+	s.mu.Unlock()
+	if !ok {
+		writeErr(w, 429, "pomaleji :)")
+		return
+	}
+	s.Hub.Broadcast(p.Code, hub.Msg{Type: "reaction", Data: map[string]string{"emoji": in.Emoji, "nickname": g.Nickname}}, hub.Stage, hub.Cockpit)
+	w.WriteHeader(204)
+}
+
+// ── moderation + show queue ────────────────────────────────────────────────
+
+func (s *Server) moderate(status string) partyHandler {
+	return func(w http.ResponseWriter, r *http.Request, p store.Party) {
+		ctx := r.Context()
+		a, err := s.Store.Asset(ctx, p.Code, r.PathValue("id"))
+		if err != nil {
+			writeErr(w, 404, "asset nenalezen")
+			return
+		}
+		if status == "approved" && a.Status != "pending" && a.Status != "rejected" {
+			writeErr(w, 409, "schválit jde jen hotový obsah (stav "+a.Status+")")
+			return
+		}
+		if err := s.Store.SetAssetStatus(ctx, p.Code, a.ID, status); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		s.pushQueue(ctx, p.Code)
+		s.pushCockpit(ctx, p)
+		w.WriteHeader(204)
+	}
+}
+
+func (s *Server) getQueue(w http.ResponseWriter, r *http.Request, p store.Party) {
+	q, err := s.Store.StageQueue(r.Context(), p.Code)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, q)
+}
+
+func (s *Server) reorderQueue(w http.ResponseWriter, r *http.Request, p store.Party) {
+	var in struct {
+		IDs []string `json:"ids"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		writeErr(w, 400, "bad json")
+		return
+	}
+	if err := s.Store.ReorderQueue(r.Context(), p.Code, in.IDs); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.pushQueue(r.Context(), p.Code)
+	w.WriteHeader(204)
+}
+
+func (s *Server) pushQueue(ctx context.Context, code string) {
+	if q, err := s.Store.StageQueue(ctx, code); err == nil {
+		s.Hub.Broadcast(code, hub.Msg{Type: "queue", Data: q}, hub.Stage, hub.Cockpit)
+	}
+}
+
+type cockpitState struct {
+	Assets  []store.Asset    `json:"assets"`
+	Guests  []store.Guest    `json:"guests"`
+	Ideas   []store.Idea     `json:"ideas"`
+	Jobs    []store.JobStats `json:"jobs"`
+	Clients map[hub.Role]int `json:"clients"`
+	Config  map[string]any   `json:"config"`
+}
+
+func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitState, error) {
+	var st cockpitState
+	var err error
+	if st.Assets, err = s.Store.Assets(ctx, p.Code); err != nil {
+		return st, err
+	}
+	if st.Guests, err = s.Store.Guests(ctx, p.Code); err != nil {
+		return st, err
+	}
+	if st.Ideas, err = s.Store.Ideas(ctx, p.Code); err != nil {
+		return st, err
+	}
+	st.Jobs, _ = s.Store.JobStats(ctx)
+	st.Clients = s.Hub.Counts(p.Code)
+	st.Config = map[string]any{
+		"restyle": s.Restyler.Name(), "moderation": s.Cfg.Moderation,
+		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL,
+	}
+	return st, nil
+}
+
+func (s *Server) cockpitState(w http.ResponseWriter, r *http.Request, p store.Party) {
+	st, err := s.cockpitPayload(r.Context(), p)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, st)
+}
+
+// pushCockpit sends the full cockpit state; parties are small (tens of guests).
+func (s *Server) pushCockpit(ctx context.Context, p store.Party) {
+	if st, err := s.cockpitPayload(ctx, p); err == nil {
+		s.Hub.Broadcast(p.Code, hub.Msg{Type: "cockpit", Data: st}, hub.Cockpit)
+	}
+}
+
+func (s *Server) listIdeas(w http.ResponseWriter, r *http.Request, p store.Party) {
+	ideas, err := s.Store.Ideas(r.Context(), p.Code)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if r.URL.Query().Get("download") == "1" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="namety-%s.json"`, p.Code))
+	}
+	writeJSON(w, 200, map[string]any{"party": p.Name, "code": p.Code, "ideas": ideas})
+}
+
+// ── scenes ─────────────────────────────────────────────────────────────────
+
+var sceneKinds = map[string]bool{
+	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
+	"webtoon": true, "lottery": true, "blank": true,
+}
+
+func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party) {
+	var in struct {
+		Kind   string          `json:"kind"`
+		Params json.RawMessage `json:"params"`
+	}
+	if err := readJSON(r, &in); err != nil || !sceneKinds[in.Kind] {
+		writeErr(w, 400, "neznámá scéna")
+		return
+	}
+	if _, err := s.Store.SetScene(r.Context(), p.Code, in.Kind, in.Params); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.broadcastParty(r, p.Code)
+	w.WriteHeader(204)
+}
+
+// panic: back to the slideshow and clear overlays — the "NSFW on the TV" button.
+func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
+	if _, err := s.Store.SetScene(r.Context(), p.Code, "slideshow", nil); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.Hub.Broadcast(p.Code, hub.Msg{Type: "panic", Data: nil})
+	s.broadcastParty(r, p.Code)
+	w.WriteHeader(204)
+}
+
+// lottery draws N players among guests who said "chci hrát" (D6); if nobody
+// signed up, among everyone. The stage shows the draw.
+func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) {
+	var in struct {
+		Count int    `json:"count"`
+		Game  string `json:"game"`
+	}
+	readJSON(r, &in)
+	in.Count = min(max(in.Count, 1), 8)
+	guests, err := s.Store.Guests(r.Context(), p.Code)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	var pool []store.Guest
+	for _, g := range guests {
+		if g.WantsToPlay {
+			pool = append(pool, g)
+		}
+	}
+	if len(pool) == 0 {
+		pool = guests
+	}
+	if len(pool) == 0 {
+		writeErr(w, 409, "na party zatím nejsou žádní hosté")
+		return
+	}
+	cands := make([]string, len(pool))
+	for i, g := range pool {
+		cands[i] = g.Nickname
+	}
+	for i := len(pool) - 1; i > 0; i-- { // Fisher–Yates with crypto/rand
+		j, _ := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		pool[i], pool[j.Int64()] = pool[j.Int64()], pool[i]
+	}
+	winners := []map[string]string{}
+	for _, g := range pool[:min(in.Count, len(pool))] {
+		winners = append(winners, map[string]string{"id": g.ID, "nickname": g.Nickname})
+	}
+	draw := map[string]any{"game": clean(in.Game, 40), "candidates": cands, "winners": winners, "at": time.Now().UnixMilli()}
+	params, _ := json.Marshal(draw)
+	if _, err := s.Store.SetScene(r.Context(), p.Code, "lottery", params); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	s.broadcastParty(r, p.Code)
+	for _, wnr := range winners {
+		s.Hub.Broadcast(p.Code, hub.Msg{Type: "lottery.won", Data: map[string]string{"guestId": wnr["id"], "game": clean(in.Game, 40)}}, hub.Guest)
+	}
+	writeJSON(w, 200, draw)
+}
+
+// ── gallery + webtoon ──────────────────────────────────────────────────────
+
+func (s *Server) listGallery(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	minScore, _ := strconv.Atoi(q.Get("score"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	items, err := s.Gallery.List(r.Context(), gallery.Filter{Style: q.Get("style"), Lora: q.Get("lora"), MinScore: minScore, Limit: limit})
+	if err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+	writeJSON(w, 200, items)
+}
+
+// Webtoon episodes are prepared folders in $PC_DATA_DIR/webtoon/<episode>/ with
+// panel images named in reading order (D7); optional title.txt.
+func (s *Server) webtoonDir() string { return filepath.Join(s.Cfg.DataDir, "webtoon") }
+
+var safeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$`)
+
+func (s *Server) listWebtoon(w http.ResponseWriter, r *http.Request) {
+	type ep struct {
+		ID     string   `json:"id"`
+		Title  string   `json:"title"`
+		Panels []string `json:"panels"`
+	}
+	out := []ep{}
+	dirs, _ := os.ReadDir(s.webtoonDir())
+	for _, d := range dirs {
+		if !d.IsDir() || !safeName.MatchString(d.Name()) {
+			continue
+		}
+		e := ep{ID: d.Name(), Title: d.Name()}
+		if t, err := os.ReadFile(filepath.Join(s.webtoonDir(), d.Name(), "title.txt")); err == nil {
+			e.Title = strings.TrimSpace(string(t))
+		}
+		files, _ := os.ReadDir(filepath.Join(s.webtoonDir(), d.Name()))
+		for _, f := range files {
+			n := strings.ToLower(f.Name())
+			if safeName.MatchString(f.Name()) && (strings.HasSuffix(n, ".png") || strings.HasSuffix(n, ".jpg") || strings.HasSuffix(n, ".jpeg") || strings.HasSuffix(n, ".webp")) {
+				e.Panels = append(e.Panels, "/webtoon/"+d.Name()+"/"+f.Name())
+			}
+		}
+		sort.Strings(e.Panels)
+		if len(e.Panels) > 0 {
+			out = append(out, e)
+		}
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) serveWebtoon(w http.ResponseWriter, r *http.Request) {
+	ep, f := r.PathValue("ep"), r.PathValue("file")
+	if !safeName.MatchString(ep) || !safeName.MatchString(f) {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, filepath.Join(s.webtoonDir(), ep, f))
+}
+
+// ── metrics ────────────────────────────────────────────────────────────────
+
+func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
+	stats, _ := s.Store.JobStats(r.Context())
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	fmt.Fprintln(w, "# TYPE partycockpit_jobs_total counter")
+	for _, j := range stats {
+		fmt.Fprintf(w, "partycockpit_jobs_total{intent=%q,status=%q} %d\n", j.Intent, j.Status, j.Count)
+	}
+	fmt.Fprintln(w, "# TYPE partycockpit_job_duration_ms_avg gauge")
+	for _, j := range stats {
+		if j.Status == "done" {
+			fmt.Fprintf(w, "partycockpit_job_duration_ms_avg{intent=%q} %.0f\n", j.Intent, j.AvgMs)
+		}
+	}
+}
+
+// clean trims, collapses whitespace/control chars and caps length in runes.
+func clean(s string, n int) string {
+	s = strings.Join(strings.FieldsFunc(s, func(r rune) bool { return r < 32 || r == ' ' || r == ' ' }), " ")
+	if r := []rune(s); len(r) > n {
+		s = string(r[:n])
+	}
+	return strings.TrimSpace(s)
+}

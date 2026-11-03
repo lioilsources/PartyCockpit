@@ -1,0 +1,105 @@
+:root {
+  --bg: #0b0613;
+  --bg-2: #160d24;
+  --panel: #1d1330;
+  --line: #34264d;
+  --text: #f4eefc;
+  --muted: #a99bbf;
+  --pink: #ff3d8b;
+  --yellow: #ffd84d;
+  --cyan: #3de8ff;
+  --green: #4dffa6;
+  --red: #ff5a5a;
+  --radius: 14px;
+  --font: 'Space Grotesk', system-ui, sans-serif;
+  --hand: 'Caveat', 'Comic Sans MS', cursive;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 0.55em 0.9em;
+  transition: background 0.15s, transform 0.08s, border-color 0.15s;
+}
+button:hover {
+  border-color: var(--muted);
+}
+button:active {
+  transform: scale(0.97);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.primary {
+  background: var(--pink);
+  border-color: var(--pink);
+  color: #fff;
+  font-weight: 700;
+}
+button.ok {
+  background: #12402c;
+  border-color: var(--green);
+}
+button.bad {
+  background: #401818;
+  border-color: var(--red);
+}
+button.on {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: #1a1000;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6em 0.75em;
+  width: 100%;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid var(--pink);
+  outline-offset: 1px;
+}
+
+a {
+  color: var(--cyan);
+}
+
+.muted {
+  color: var(--muted);
+}
+.err {
+  color: var(--red);
+}

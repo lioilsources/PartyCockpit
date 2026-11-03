@@ -1,0 +1,133 @@
+// Package hub fans party events out to WebSocket clients (stage, cockpit, guest).
+package hub
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/coder/websocket"
+)
+
+type Role string
+
+const (
+	Stage   Role = "stage"
+	Cockpit Role = "cockpit"
+	Guest   Role = "guest"
+)
+
+// Msg is the wire envelope: {"type": "...", "data": ...}.
+type Msg struct {
+	Type string `json:"type"`
+	Data any    `json:"data"`
+}
+
+type client struct {
+	role Role
+	send chan []byte
+}
+
+type Hub struct {
+	mu    sync.RWMutex
+	rooms map[string]map[*client]struct{}
+}
+
+func New() *Hub { return &Hub{rooms: map[string]map[*client]struct{}{}} }
+
+// Broadcast sends msg to every client of the party whose role is in roles
+// (no roles = everyone). Slow clients drop messages instead of blocking.
+func (h *Hub) Broadcast(code string, msg Msg, roles ...Role) {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		slog.Error("hub marshal", "type", msg.Type, "err", err)
+		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.rooms[code] {
+		if len(roles) > 0 && !has(roles, c.role) {
+			continue
+		}
+		select {
+		case c.send <- b:
+		default:
+		}
+	}
+}
+
+func has(roles []Role, r Role) bool {
+	for _, x := range roles {
+		if x == r {
+			return true
+		}
+	}
+	return false
+}
+
+// Counts returns connected clients per role.
+func (h *Hub) Counts(code string) map[Role]int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := map[Role]int{}
+	for c := range h.rooms[code] {
+		out[c.role]++
+	}
+	return out
+}
+
+// Serve runs one WebSocket connection until it closes. hello is sent first
+// (the full state), so a reconnecting stage is consistent immediately.
+func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, role Role, hello []Msg) {
+	c := &client{role: role, send: make(chan []byte, 64)}
+	h.mu.Lock()
+	if h.rooms[code] == nil {
+		h.rooms[code] = map[*client]struct{}{}
+	}
+	h.rooms[code][c] = struct{}{}
+	h.mu.Unlock()
+	defer func() {
+		h.mu.Lock()
+		delete(h.rooms[code], c)
+		if len(h.rooms[code]) == 0 {
+			delete(h.rooms, code)
+		}
+		h.mu.Unlock()
+	}()
+
+	ctx = conn.CloseRead(ctx) // clients only listen; pings keep the line alive
+	for _, m := range hello {
+		b, _ := json.Marshal(m)
+		if err := write(ctx, conn, b); err != nil {
+			return
+		}
+	}
+	ping := time.NewTicker(20 * time.Second)
+	defer ping.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			conn.Close(websocket.StatusNormalClosure, "")
+			return
+		case b := <-c.send:
+			if err := write(ctx, conn, b); err != nil {
+				return
+			}
+		case <-ping.C:
+			pctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			err := conn.Ping(pctx)
+			cancel()
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func write(ctx context.Context, conn *websocket.Conn, b []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return conn.Write(ctx, websocket.MessageText, b)
+}
