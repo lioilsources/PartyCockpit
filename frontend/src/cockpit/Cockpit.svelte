@@ -236,6 +236,16 @@
     done = { ...done, [id]: !done[id] };
     store.set(runKey, JSON.stringify(done));
   }
+  // a leaked token (a photo of the tablet) is replaced; other cockpits drop (D19)
+  async function rotateToken() {
+    if (!confirm('Vyměnit cockpit token? Ostatní otevřené Cockpity se odpojí a budou potřebovat nový odkaz.')) return;
+    await act(async () => {
+      const r = await api.post<{ cockpitToken: string }>(p('/cockpit/rotate'), {}, token);
+      token = r.cockpitToken;
+      store.set(`pc.cockpit.${code}`, token);
+      start();
+    });
+  }
   const problems = $derived(checks.filter((c) => c.status === 'fail').length);
   const warnings = $derived(checks.filter((c) => c.status === 'warn').length);
 
@@ -382,6 +392,7 @@
         </div>
         <div>
           <h3>Ručně</h3>
+          <p class="muted small">Token unikl (fotka tabletu)? <button onclick={rotateToken}>Vyměnit cockpit token</button></p>
           <ul>
             {#each manual as m (m.id)}
               <li><label><input type="checkbox" checked={!!done[m.id]} onchange={() => toggle(m.id)} /> {m.label}</label></li>

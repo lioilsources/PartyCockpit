@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/lioilsources/PartyCockpit/backend/internal/gallery"
@@ -51,7 +52,7 @@ func (s *Server) createParty(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := s.Store.CreateParty(r.Context(), name, s.Cfg.PartyTTL)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	pub, _ := s.publicParty(r, p)
@@ -61,7 +62,7 @@ func (s *Server) createParty(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listParties(w http.ResponseWriter, r *http.Request) {
 	ps, err := s.Store.Parties(r.Context())
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	type row struct {
@@ -105,7 +106,7 @@ func (s *Server) publicParty(r *http.Request, p store.Party) (PublicParty, error
 func (s *Server) getParty(w http.ResponseWriter, r *http.Request, p store.Party) {
 	pub, err := s.publicParty(r, p)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	writeJSON(w, 200, pub)
@@ -155,7 +156,7 @@ func (s *Server) patchParty(w http.ResponseWriter, r *http.Request, p store.Part
 		in.DJfyCode = &c
 	}
 	if err := s.Store.UpdateParty(r.Context(), p.Code, in); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	if in.DJfyCode != nil {
@@ -189,9 +190,21 @@ func (s *Server) createGuest(w http.ResponseWriter, r *http.Request, p store.Par
 		writeErr(w, 409, "party je plná")
 		return
 	}
+	// two "Žofie" can't be told apart on the stage or in the recap
+	if taken, _ := s.Store.NicknameTaken(r.Context(), p.Code, nick); taken {
+		suggest := ""
+		base := string([]rune(nick)[:min(len([]rune(nick)), 21)])
+		for i := 2; i < 100 && suggest == ""; i++ {
+			if t, _ := s.Store.NicknameTaken(r.Context(), p.Code, fmt.Sprintf("%s %d", base, i)); !t {
+				suggest = fmt.Sprintf("%s %d", base, i)
+			}
+		}
+		writeJSON(w, 409, map[string]string{"error": "přezdívku už někdo má", "suggest": suggest})
+		return
+	}
 	g, err := s.Store.CreateGuest(r.Context(), p.Code, nick)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.pushCockpit(r.Context(), p)
@@ -204,7 +217,7 @@ func (s *Server) setPlay(w http.ResponseWriter, r *http.Request, p store.Party, 
 	}
 	readJSON(r, &in)
 	if err := s.Store.SetWantsToPlay(r.Context(), p.Code, g.ID, in.Wants); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.pushCockpit(r.Context(), p)
@@ -214,8 +227,16 @@ func (s *Server) setPlay(w http.ResponseWriter, r *http.Request, p store.Party, 
 func (s *Server) guestAssets(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
 	as, err := s.Store.GuestAssets(r.Context(), p.Code, g.ID)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
+	}
+	for i, a := range as {
+		var m map[string]any
+		if json.Unmarshal(a.Meta, &m) == nil && m["error"] != nil {
+			// provider errors name hosts and URLs; the operator sees them in the Cockpit
+			m["error"] = "nepovedlo se, zkus to znovu"
+			as[i].Meta, _ = json.Marshal(m)
+		}
 	}
 	writeJSON(w, 200, map[string]any{"guest": g, "assets": as})
 }
@@ -287,7 +308,7 @@ func (s *Server) createSticker(w http.ResponseWriter, r *http.Request, p store.P
 	meta, _ := json.Marshal(m)
 	a, err := s.Store.CreateAsset(r.Context(), store.Asset{PartyCode: p.Code, GuestID: g.ID, Kind: "sticker", Meta: meta, Status: "pending"})
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.pushCockpit(r.Context(), p)
@@ -312,7 +333,7 @@ func (s *Server) createIdea(w http.ResponseWriter, r *http.Request, p store.Part
 	}
 	i, err := s.Store.CreateIdea(r.Context(), p.Code, g, text)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.pushCockpit(r.Context(), p)
@@ -360,7 +381,7 @@ func (s *Server) moderate(status string) partyHandler {
 			return
 		}
 		if err := s.Store.SetAssetStatus(ctx, p.Code, a.ID, status); err != nil {
-			writeErr(w, 500, err.Error())
+			serverErr(w, r, err)
 			return
 		}
 		if status == "approved" {
@@ -375,7 +396,7 @@ func (s *Server) moderate(status string) partyHandler {
 func (s *Server) getQueue(w http.ResponseWriter, r *http.Request, p store.Party) {
 	q, err := s.Store.StageQueue(r.Context(), p.Code)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	writeJSON(w, 200, publicQueue(q))
@@ -410,7 +431,7 @@ func (s *Server) reorderQueue(w http.ResponseWriter, r *http.Request, p store.Pa
 		return
 	}
 	if err := s.Store.ReorderQueue(r.Context(), p.Code, in.IDs); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.pushQueue(r.Context(), p.Code)
@@ -457,7 +478,7 @@ func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitStat
 func (s *Server) cockpitState(w http.ResponseWriter, r *http.Request, p store.Party) {
 	st, err := s.cockpitPayload(r.Context(), p)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	writeJSON(w, 200, st)
@@ -473,7 +494,7 @@ func (s *Server) pushCockpit(ctx context.Context, p store.Party) {
 func (s *Server) listIdeas(w http.ResponseWriter, r *http.Request, p store.Party) {
 	ideas, err := s.Store.Ideas(r.Context(), p.Code)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	if r.URL.Query().Get("download") == "1" {
@@ -501,7 +522,7 @@ func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party)
 		return
 	}
 	if _, err := s.Store.SetScene(r.Context(), p.Code, in.Kind, in.Params); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.broadcastParty(r, p.Code)
@@ -511,7 +532,7 @@ func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party)
 // panic: back to the slideshow and clear overlays — the "NSFW on the TV" button.
 func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
 	if _, err := s.Store.SetScene(r.Context(), p.Code, "slideshow", nil); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.unliveAll(p.Code)
@@ -533,7 +554,7 @@ func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) 
 	in.Count = min(max(in.Count, 1), 8)
 	guests, err := s.Store.Guests(r.Context(), p.Code)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	var pool []store.Guest
@@ -567,7 +588,7 @@ func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) 
 	draw := map[string]any{"game": clean(in.Game, 40), "candidates": cands, "winners": winners, "at": time.Now().UnixMilli()}
 	params, _ := json.Marshal(draw)
 	if _, err := s.Store.SetScene(r.Context(), p.Code, "lottery", params); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.broadcastParty(r, p.Code)
@@ -657,6 +678,13 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 
 // clean trims, collapses whitespace/control chars and caps length in runes.
 func clean(s string, n int) string {
+	// format characters (zero-width, bidi overrides) can hide or flip text on the stage
+	s = strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, s)
 	s = strings.Join(strings.FieldsFunc(s, func(r rune) bool { return r < 32 || r == ' ' || r == ' ' }), " ")
 	if r := []rune(s); len(r) > n {
 		s = string(r[:n])

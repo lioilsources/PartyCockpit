@@ -144,6 +144,7 @@ func (s *Server) Routes() http.Handler {
 	// cockpit
 	mux.HandleFunc("GET /api/parties/{code}/cockpit", s.cockpit(s.cockpitState))
 	mux.HandleFunc("POST /api/parties/{code}/cockpit/ticket", s.cockpit(s.issueTicket))
+	mux.HandleFunc("POST /api/parties/{code}/cockpit/rotate", s.cockpit(s.rotateToken))
 	mux.HandleFunc("PATCH /api/parties/{code}", s.cockpit(s.patchParty))
 	mux.HandleFunc("POST /api/parties/{code}/assets/{id}/approve", s.cockpit(s.moderate("approved")))
 	mux.HandleFunc("POST /api/parties/{code}/assets/{id}/reject", s.cockpit(s.moderate("rejected")))
@@ -181,13 +182,32 @@ func (s *Server) Routes() http.Handler {
 		}
 		writeJSON(w, 200, s.Glyphs.Sheets)
 	})
-	mux.HandleFunc("GET /glyphs/{id}/{file}", func(w http.ResponseWriter, r *http.Request) { s.Glyphs.Serve(w, r, r.PathValue("id"), r.PathValue("file")) })
+	mux.HandleFunc("GET /glyphs/{id}/{file}", func(w http.ResponseWriter, r *http.Request) {
+		s.Glyphs.Serve(w, r, r.PathValue("id"), r.PathValue("file"))
+	})
 	mux.HandleFunc("GET /api/webtoon", s.listWebtoon)
 	mux.HandleFunc("GET /webtoon/{ep}/{file}", s.serveWebtoon)
 
 	mux.HandleFunc("GET /ws/parties/{code}", s.ws)
 	mux.HandleFunc("GET /", s.spa)
-	return logRequests(mux)
+	return securityHeaders(logRequests(mux))
+}
+
+// securityHeaders: no sniffing, no framing, no referrer. The CSP is report-only
+// until it has been checked on a real stage (Pixi, WebGL, the AudioWorklet from
+// a blob URL); switch the header name to enforce it (D19).
+func securityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; " +
+		"img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; " +
+		"font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy-Report-Only", csp)
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ── middleware ─────────────────────────────────────────────────────────────
@@ -202,7 +222,7 @@ func (s *Server) party(h partyHandler) http.HandlerFunc {
 			writeErr(w, 404, "party nenalezena")
 			return
 		} else if err != nil {
-			writeErr(w, 500, err.Error())
+			serverErr(w, r, err)
 			return
 		}
 		h(w, r, p)
@@ -216,7 +236,7 @@ func (s *Server) guest(h guestHandler) http.HandlerFunc {
 			writeErr(w, 404, "host nenalezen")
 			return
 		} else if err != nil {
-			writeErr(w, 500, err.Error())
+			serverErr(w, r, err)
 			return
 		}
 		h(w, r, p, g)
@@ -294,6 +314,13 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+// serverErr logs the detail and answers a plain 500: a phone does not need
+// paths, provider URLs or SQL in an error message (D19).
+func serverErr(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "err", err)
+	writeErr(w, 500, "chyba serveru, zkus to za chvíli")
 }
 
 func readJSON(r *http.Request, v any) error {

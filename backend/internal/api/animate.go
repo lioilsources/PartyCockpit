@@ -187,7 +187,7 @@ func (s *Server) animateGallery(w http.ResponseWriter, r *http.Request, p store.
 	} else {
 		q, err := s.Store.StageQueue(ctx, p.Code)
 		if err != nil {
-			writeErr(w, 500, err.Error())
+			serverErr(w, r, err)
 			return
 		}
 		photos = q
@@ -202,7 +202,7 @@ func (s *Server) animateGallery(w http.ResponseWriter, r *http.Request, p store.
 			continue
 		}
 		if _, err := s.submitAnimation(ctx, p, a, m); err != nil {
-			writeErr(w, 500, err.Error())
+			serverErr(w, r, err)
 			return
 		}
 		n++

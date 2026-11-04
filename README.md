@@ -11,7 +11,7 @@ Mac Mini, Windows mini PC nebo domácí server.
 
 | Role | URL | Kdo |
 |---|---|---|
-| Stage | `/stage/<KÓD>` | prohlížeč na Mac Mini / mini PC s HDMI do TV (kiosk) |
+| Stage | `/stage/<KÓD>?key=…` (odkaz „Otevřít plátno“ v Cockpitu) | prohlížeč na Mac Mini / mini PC s HDMI do TV (kiosk) |
 | Cockpit | `/cockpit/<KÓD>` | operátor (telefon, tablet, notebook) |
 | Guest | `/join/<KÓD>` | hosté (QR na plátně), bez instalace a účtu |
 
@@ -60,12 +60,13 @@ Hosty za Cloudflare Access ověřuje `CF_ACCESS_CLIENT_ID/SECRET`.
 
 ```sh
 # macOS
-open -a "Google Chrome" --args --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?audio=1"
+open -a "Google Chrome" --args --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?key=KLIC&audio=1"
 # Windows
-chrome.exe --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?audio=1"
+chrome.exe --kiosk --use-fake-ui-for-media-stream --disable-features=WebRtcHideLocalIpsWithMdns "http://localhost:8098/stage/KOD?key=KLIC&audio=1"
 ```
 
-`?audio=1` zapne detekci beatu z audio vstupu (BlackHole / VB-Cable / mikrofon).
+`KLIC` je klíč plátna z odkazu „Otevřít plátno“ v Cockpitu; plátno si ho po prvním
+otevření pamatuje a z adresy ho smaže. `?audio=1` zapne detekci beatu z audio vstupu (BlackHole / VB-Cable / mikrofon).
 Přednost má ale BPM z DJfy nebo tap tempo z Cockpitu.
 
 ## Živé streamy

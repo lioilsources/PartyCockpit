@@ -91,6 +91,19 @@ písmech, Kruh se 4 a 3 hráči na autopilotu (ztráta životů, vypadnutí), ov
 v telefonu a party epizoda. **Neověřeno:** hra s několika skutečnými telefony
 naráz (latence na Wi-Fi), konec hry s vyhlášením vítěze.
 
+## 2026-11-05: bezpečnostní průchod (D19)
+
+| Část | Stav |
+|---|---|
+| klíč plátna, konec party, limity na IP, hosta a sockety | ✅ testy |
+| tickety místo tokenů v URL, seznam party jen s admin tokenem, soubory podle stavu, origin, max 36 Mpx | ✅ testy |
+| hlavičky (CSP zatím report-only), obecné chyby, přezdívky, rotace tokenu | ✅ testy |
+| ikona appky (favicon, PWA, Apple touch) | ✅ |
+
+**Neověřeno v prohlížeči:** Chrome pro automatizaci byl během práce nedostupný.
+Projít: Cockpit → „Otevřít plátno“ (klíč zmizí z URL), host vidí svoje čekající
+fotky, Cockpit náhledy čekajících, mikrofon s ticketem, CSP v konzoli bez hlášek.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).

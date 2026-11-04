@@ -207,3 +207,34 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
   jen popisek vypravěče. Náměty se nepoužívají, protože se neschvalují.
 - Generovaná epizoda s hosty jako postavami (Ol1nLLM character library) zůstává na
   později. Potřebuje GPU a vlastní pipeline.
+
+## D19: Bezpečnostní průchod (2026-11-05)
+Plán a nálezy: `docs/SECURITY_PLAN.md`. Model hrozby: cizí telefony v síti party,
+které znají kód z plátna.
+- **Plátno má klíč** (`stage_key`, migrace 3). Bez něj šlo s kódem party otevřít
+  živé kamery hostů. Klíč nese jen odkaz z Cockpitu/Home; plátno si ho uloží
+  a z URL ho smaže.
+- **Party končí**: zápisy hostů a přidání nového hosta po `ends_at` vrací 410.
+  Čtení a recap běží dál. Cockpit může prodloužit o 2 h (nejvýš +24 h od teď).
+- **Limity**: 400 hostů, 200 vzkazů a 100 námětů na hosta, 20 vzkazů/min,
+  token bucket na IP pro zápisy bez tokenu (30/10 s, zip recapu stojí 10),
+  8 socketů hosta na IP, mikrofon 50 rámců/s, vstup hry 30/s. Cockpit limity
+  nemá. Za reverzní proxy `PC_TRUST_PROXY=1`, jinak by všichni měli IP proxy.
+- **Tokeny mimo URL**: sockety Cockpitu a mikrofonu berou jednorázový ticket
+  na 30 s, token jde v `#token=` a stahování námětů přes `fetch`. `?token=` se
+  kvůli starým odkazům ještě jednou přečte.
+- **Seznam party** (obsahuje cockpit tokeny) vyžaduje admin token vždy. Bez
+  `PC_ADMIN_TOKEN` se nevydá vůbec, zakládat jde dál (domácí použití).
+- **Soubory**: `/files` vydá jen schválené soubory a stilly schválených tanců.
+  Cockpit čekající soubory otevírá odvozeným `fileKey` (HMAC z tokenu, jen na
+  čtení souborů), host svoje přes `/guests/{gid}/files/`. Originály zůstávají
+  soukromé i po schválení restylu.
+- Sockety odmítají cizí origin; upload nad 36 Mpx se odmítne před dekódováním.
+- **Hlavičky**: nosniff, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+  CSP je zatím jen `Report-Only`: na skutečném plátně (Pixi, WebGL, AudioWorklet
+  z blob URL) ji nikdo neověřil. Po ověření stačí změnit název hlavičky.
+- **Hygiena**: 500 hostovi jen obecná hláška (detail v logu), chyby providerů
+  host vidí obecně a Cockpit celé, `clean()` maže formátovací znaky (zero-width,
+  bidi), stejná přezdívka → 409 s návrhem („Ema 2“), cockpit token jde vyměnit.
+- Nechává se: `/metrics` a `/healthz` veřejné (jen agregáty), plain http v domácí
+  LAN (preflight varuje). Pro B2B: `PC_TLS_*` a `PC_ADMIN_TOKEN` povinně.

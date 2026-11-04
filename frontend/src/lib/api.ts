@@ -1,5 +1,9 @@
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(
+    public status: number,
+    message: string,
+    public data: any = null,
+  ) {
     super(message);
   }
 }
@@ -22,7 +26,7 @@ async function req<T>(method: string, path: string, body?: unknown, token?: stri
   } catch {
     /* not json */
   }
-  if (!r.ok) throw new ApiError(r.status, data?.error ?? `Chyba ${r.status}`);
+  if (!r.ok) throw new ApiError(r.status, data?.error ?? `Chyba ${r.status}`, data);
   return data as T;
 }
 

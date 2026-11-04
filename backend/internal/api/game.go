@@ -82,7 +82,7 @@ func (s *Server) startGame(w http.ResponseWriter, r *http.Request, p store.Party
 	}
 	params, _ := json.Marshal(map[string]any{"game": "kruh", "players": players})
 	if _, err := s.Store.SetScene(r.Context(), p.Code, "game", params); err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	s.gmu.Lock()

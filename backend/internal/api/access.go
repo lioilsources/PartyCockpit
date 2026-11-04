@@ -15,6 +15,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
 )
 
@@ -132,4 +133,16 @@ func (s *Server) acceptOptions() *websocket.AcceptOptions {
 		pats = append(pats, u.Host)
 	}
 	return &websocket.AcceptOptions{OriginPatterns: pats}
+}
+
+// rotateToken (cockpit): a leaked token (a photo of the tablet) can be
+// replaced. Open cockpit sockets drop; the caller gets the new token.
+func (s *Server) rotateToken(w http.ResponseWriter, r *http.Request, p store.Party) {
+	token := store.NewID(16)
+	if err := s.Store.SetCockpitToken(r.Context(), p.Code, token); err != nil {
+		serverErr(w, r, err)
+		return
+	}
+	s.Hub.Close(p.Code, func(c hub.Peer) bool { return c.Role == hub.Cockpit })
+	writeJSON(w, 200, map[string]string{"cockpitToken": token})
 }

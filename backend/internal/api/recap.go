@@ -63,7 +63,7 @@ func recapItems(q []store.Asset) []recapItem {
 func (s *Server) recap(w http.ResponseWriter, r *http.Request, p store.Party) {
 	q, err := s.Store.StageQueue(r.Context(), p.Code)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	writeJSON(w, 200, map[string]any{
@@ -85,7 +85,7 @@ func (s *Server) recapZip(w http.ResponseWriter, r *http.Request, p store.Party)
 	}
 	q, err := s.Store.StageQueue(r.Context(), p.Code)
 	if err != nil {
-		writeErr(w, 500, err.Error())
+		serverErr(w, r, err)
 		return
 	}
 	items := recapItems(q)

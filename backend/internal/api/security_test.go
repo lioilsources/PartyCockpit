@@ -140,7 +140,7 @@ func TestGuestSocketsPerIP(t *testing.T) {
 		t.Fatalf("socket over the per-IP cap: %d, want 429", st)
 	}
 	// the stage and the cockpit are not counted
-	e.dial("role=stage&key=" + e.key).waitFor("party", nil)
+	e.dial("role=stage&key="+e.key).waitFor("party", nil)
 }
 
 // do2json returns the raw body of an unauthenticated request.
@@ -264,5 +264,55 @@ func TestHugeUploadRefused(t *testing.T) {
 	res.Body.Close()
 	if res.StatusCode != 400 {
 		t.Fatalf("64 Mpx upload: %d, want 400", res.StatusCode)
+	}
+}
+
+func TestHeadersAndHygiene(t *testing.T) {
+	e := newEnv(t)
+	res, err := http.Get(e.ts.URL + "/api/parties/" + e.code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	for _, h := range []string{"X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Content-Security-Policy-Report-Only"} {
+		if res.Header.Get(h) == "" {
+			t.Fatalf("missing header %s", h)
+		}
+	}
+	if got := clean("Ahoj​ ‮ecnaL", 40); got != "Ahoj ecnaL" {
+		t.Fatalf("clean kept format characters: %q", got)
+	}
+
+	// a second "Ema" is refused with a suggestion
+	e.guest("Ema")
+	var clash struct{ Error, Suggest string }
+	if st := e.do("POST", "/api/parties/"+e.code+"/guests", map[string]any{"nickname": "ema"}, &clash); st != 409 || clash.Suggest != "ema 2" {
+		t.Fatalf("nickname clash: %d %+v", st, clash)
+	}
+}
+
+func TestRotateCockpitToken(t *testing.T) {
+	e := newEnv(t)
+	cockpit := e.dial("role=cockpit&token=" + e.token)
+	cockpit.waitFor("party", nil)
+	var out struct{ CockpitToken string }
+	if st := e.do("POST", "/api/parties/"+e.code+"/cockpit/rotate", nil, &out); st != 200 || out.CockpitToken == "" || out.CockpitToken == e.token {
+		t.Fatalf("rotate: %d", st)
+	}
+	timeout := time.After(2 * time.Second)
+	for closed := false; !closed; {
+		select {
+		case _, open := <-cockpit.in:
+			closed = !open
+		case <-timeout:
+			t.Fatal("the old cockpit socket must be closed")
+		}
+	}
+	if st := e.do("GET", "/api/parties/"+e.code+"/cockpit", nil, nil); st != 401 {
+		t.Fatalf("old token: %d, want 401", st)
+	}
+	e.token = out.CockpitToken
+	if st := e.do("GET", "/api/parties/"+e.code+"/cockpit", nil, nil); st != 200 {
+		t.Fatalf("new token: %d", st)
 	}
 }

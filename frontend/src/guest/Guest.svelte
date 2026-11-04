@@ -41,6 +41,11 @@
       sock = openSock();
     } catch (e: any) {
       err = e.message;
+      // nickname taken: offer the free variant the server found
+      if (e.status === 409 && e.data?.suggest) {
+        nick = e.data.suggest;
+        err = `${e.message}, co třeba „${e.data.suggest}“?`;
+      }
     }
   }
 

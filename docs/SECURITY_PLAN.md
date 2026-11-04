@@ -1,5 +1,8 @@
 # Bezpečnostní průchod API — plán oprav
 
+**Hotovo 2026-11-05** ve třech commitech (Security 1/3–3/3), shrnutí v D19.
+Odchylka: CSP je zatím `Report-Only`, dokud ji někdo neověří na skutečném plátně.
+
 Stav k 2026-11-04 (po commitu `2a393c7`). Model hrozby: party box v LAN, kde jsou
 cizí telefony (hosté i náhodní lidé na Wi-Fi podniku). Útočník zná kód party,
 protože je na plátně. Neřešíme internet ani cílený útok na box samotný.
