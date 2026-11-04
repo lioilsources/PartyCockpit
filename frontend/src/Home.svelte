@@ -5,7 +5,7 @@
   let adminToken = $state(store.get('pc.admin') ?? '');
   let name = $state('');
   let err = $state('');
-  let parties = $state<(Party & { cockpitToken: string })[]>([]);
+  let parties = $state<(Party & { cockpitToken: string; stageKey: string })[]>([]);
   let joinCode = $state('');
 
   async function load() {
@@ -22,15 +22,16 @@
     err = '';
     try {
       store.set('pc.admin', adminToken);
-      const r = await api.adminPost<{ party: Party; cockpitToken: string }>('/api/parties', { name }, adminToken);
+      const r = await api.adminPost<{ party: Party; cockpitToken: string; stageKey: string }>('/api/parties', { name }, adminToken);
       store.set(`pc.cockpit.${r.party.code}`, r.cockpitToken);
+      store.set(`pc.stage.key.${r.party.code}`, r.stageKey);
       location.href = `/cockpit/${r.party.code}`;
     } catch (e: any) {
       err = e.message;
     }
   }
 
-  function cockpit(p: Party & { cockpitToken: string }) {
+  function cockpit(p: Party & { cockpitToken: string; stageKey: string }) {
     store.set(`pc.cockpit.${p.code}`, p.cockpitToken);
     location.href = `/cockpit/${p.code}`;
   }
@@ -71,7 +72,7 @@
             <strong>{p.name}</strong> <code>{p.code}</code>
             <span class="muted">{new Date(p.createdAt).toLocaleString('cs')}</span>
             <button onclick={() => cockpit(p)}>Cockpit</button>
-            <a href={`/stage/${p.code}`} target="_blank">Plátno</a>
+            <a href={`/stage/${p.code}?key=${p.stageKey}`} target="_blank">Plátno</a>
           </li>
         {/each}
       </ul>

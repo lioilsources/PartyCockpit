@@ -90,17 +90,18 @@ type Party struct {
 	Mode         string `json:"mode"`
 	LoopMode     string `json:"loopMode"`
 	CockpitToken string `json:"-"`
+	StageKey     string `json:"-"` // the stage's socket key (D19)
 	DJfyCode     string `json:"djfyCode"`
 	AutoLive     bool   `json:"autoLive"` // animate every approved photo (M4)
 	CreatedAt    int64  `json:"createdAt"`
 	EndsAt       int64  `json:"endsAt"`
 }
 
-const partyCols = "code, name, mode, loop_mode, cockpit_token, djfy_code, auto_live, created_at, ends_at"
+const partyCols = "code, name, mode, loop_mode, cockpit_token, stage_key, djfy_code, auto_live, created_at, ends_at"
 
 func scanParty(r interface{ Scan(...any) error }) (Party, error) {
 	var p Party
-	err := r.Scan(&p.Code, &p.Name, &p.Mode, &p.LoopMode, &p.CockpitToken, &p.DJfyCode, &p.AutoLive, &p.CreatedAt, &p.EndsAt)
+	err := r.Scan(&p.Code, &p.Name, &p.Mode, &p.LoopMode, &p.CockpitToken, &p.StageKey, &p.DJfyCode, &p.AutoLive, &p.CreatedAt, &p.EndsAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -109,12 +110,12 @@ func scanParty(r interface{ Scan(...any) error }) (Party, error) {
 
 func (s *Store) CreateParty(ctx context.Context, name string, ttl time.Duration) (Party, error) {
 	now := s.Now()
-	p := Party{Name: name, Mode: "strict", LoopMode: "loop", CockpitToken: NewID(16),
+	p := Party{Name: name, Mode: "strict", LoopMode: "loop", CockpitToken: NewID(16), StageKey: NewID(16),
 		CreatedAt: now.UnixMilli(), EndsAt: now.Add(ttl).UnixMilli()}
 	for range 5 {
 		p.Code = newPartyCode()
-		_, err := s.db.ExecContext(ctx, "INSERT INTO parties("+partyCols+") VALUES(?,?,?,?,?,?,?,?,?)",
-			p.Code, p.Name, p.Mode, p.LoopMode, p.CockpitToken, p.DJfyCode, p.AutoLive, p.CreatedAt, p.EndsAt)
+		_, err := s.db.ExecContext(ctx, "INSERT INTO parties("+partyCols+") VALUES(?,?,?,?,?,?,?,?,?,?)",
+			p.Code, p.Name, p.Mode, p.LoopMode, p.CockpitToken, p.StageKey, p.DJfyCode, p.AutoLive, p.CreatedAt, p.EndsAt)
 		if err == nil {
 			_, err = s.db.ExecContext(ctx, "INSERT INTO scene_state(party_code, kind, started_at) VALUES(?, 'slideshow', ?)", p.Code, p.CreatedAt)
 			return p, err
@@ -153,6 +154,7 @@ type PartyPatch struct {
 	LoopMode *string `json:"loopMode"`
 	DJfyCode *string `json:"djfyCode"`
 	AutoLive *bool   `json:"autoLive"`
+	EndsAt   *int64  `json:"endsAt"` // ms; the handler bounds it
 }
 
 func (s *Store) UpdateParty(ctx context.Context, code string, p PartyPatch) error {
@@ -163,11 +165,55 @@ func (s *Store) UpdateParty(ctx context.Context, code string, p PartyPatch) erro
 		_, err := s.db.ExecContext(ctx, "UPDATE parties SET "+col+" = ? WHERE code = ?", *v, code)
 		return err
 	}
-	var autoErr error
+	var autoErr, endErr error
 	if p.AutoLive != nil {
 		_, autoErr = s.db.ExecContext(ctx, "UPDATE parties SET auto_live = ? WHERE code = ?", *p.AutoLive, code)
 	}
-	return errors.Join(set("name", p.Name), set("mode", p.Mode), set("loop_mode", p.LoopMode), set("djfy_code", p.DJfyCode), autoErr)
+	if p.EndsAt != nil {
+		_, endErr = s.db.ExecContext(ctx, "UPDATE parties SET ends_at = ? WHERE code = ?", *p.EndsAt, code)
+	}
+	return errors.Join(set("name", p.Name), set("mode", p.Mode), set("loop_mode", p.LoopMode), set("djfy_code", p.DJfyCode), autoErr, endErr)
+}
+
+// SetCockpitToken replaces the party's cockpit token (rotation, D19).
+func (s *Store) SetCockpitToken(ctx context.Context, code, token string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE parties SET cockpit_token = ? WHERE code = ?", token, code)
+	return err
+}
+
+// GuestCount is the number of guests that joined the party.
+func (s *Store) GuestCount(ctx context.Context, code string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ?", code).Scan(&n)
+	return n, err
+}
+
+// NicknameTaken reports whether another guest of the party uses the nickname (any case).
+func (s *Store) NicknameTaken(ctx context.Context, code, nick string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ? AND lower(nickname) = lower(?)", code, nick).Scan(&n)
+	return n > 0, err
+}
+
+// GuestPosts counts a guest's assets of a kind created at or after since (ms, 0 = ever).
+func (s *Store) GuestPosts(ctx context.Context, code, guestID, kind string, since int64) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets WHERE party_code = ? AND guest_id = ? AND kind = ? AND created_at >= ?",
+		code, guestID, kind, since).Scan(&n)
+	return n, err
+}
+
+// GuestIdeas counts a guest's story ideas.
+func (s *Store) GuestIdeas(ctx context.Context, code, guestID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM ideas WHERE party_code = ? AND guest_id = ?", code, guestID).Scan(&n)
+	return n, err
+}
+
+// AssetByFile finds the asset that owns a file (newest first: a fallback
+// restyle shares its original's file name).
+func (s *Store) AssetByFile(ctx context.Context, code, file string) ([]Asset, error) {
+	return s.queryAssets(ctx, "SELECT "+assetCols+" FROM assets WHERE party_code = ? AND file = ? ORDER BY created_at DESC", code, file)
 }
 
 // ExpiredParties returns parties whose end lies more than grace in the past.

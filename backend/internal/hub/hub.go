@@ -28,6 +28,7 @@ type Peer struct {
 	Role     Role
 	StreamID string // Streamer only
 	GuestID  string // Guest only, when the phone said who it is (?guest=, verified)
+	IP       string // remote address, for the per-IP connection limit
 }
 
 // Handlers receive what clients send. Both may be nil.
@@ -44,7 +45,8 @@ type Msg struct {
 
 type client struct {
 	Peer
-	send chan []byte
+	send  chan []byte
+	close context.CancelFunc
 }
 
 type Hub struct {
@@ -120,6 +122,30 @@ func (h *Hub) Find(code string, match func(Peer) bool) []Peer {
 	return out
 }
 
+// Count returns how many connected clients of the party match.
+func (h *Hub) Count(code string, match func(Peer) bool) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	n := 0
+	for c := range h.rooms[code] {
+		if match(c.Peer) {
+			n++
+		}
+	}
+	return n
+}
+
+// Close disconnects the matching clients (a rotated cockpit token, D19).
+func (h *Hub) Close(code string, match func(Peer) bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.rooms[code] {
+		if match(c.Peer) && c.close != nil {
+			c.close()
+		}
+	}
+}
+
 // Counts returns connected clients per role.
 func (h *Hub) Counts(code string) map[Role]int {
 	h.mu.RLock()
@@ -135,7 +161,9 @@ func (h *Hub) Counts(code string) map[Role]int {
 // (the full state), so a reconnecting stage is consistent immediately.
 // Client messages (WebRTC signalling) go to hs.OnMsg, at most 40 per second.
 func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, peer Peer, hello []Msg, hs Handlers) {
-	c := &client{Peer: peer, send: make(chan []byte, 64)}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	c := &client{Peer: peer, send: make(chan []byte, 64), close: cancel}
 	h.mu.Lock()
 	if h.rooms[code] == nil {
 		h.rooms[code] = map[*client]struct{}{}
@@ -154,8 +182,6 @@ func (h *Hub) Serve(ctx context.Context, conn *websocket.Conn, code string, peer
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	conn.SetReadLimit(64 << 10) // an SDP is a few kB
 	go func() {
 		defer cancel()

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"regexp"
 	"sync/atomic"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -22,6 +23,8 @@ import (
 )
 
 var langRe = regexp.MustCompile(`^[a-z]{2,3}$`)
+
+const maxMicFrames = 50 // per second; the browser sends 20 ms frames (D19)
 
 type mic struct {
 	conn *websocket.Conn
@@ -86,13 +89,14 @@ func (s *Server) micSocket(w http.ResponseWriter, r *http.Request, p store.Party
 	if err != nil {
 		return
 	}
-	conn.SetReadLimit(256 << 10)
+	conn.SetReadLimit(64 << 10) // 20 ms of PCM16 at 16 kHz is 640 bytes
 	ctx := context.WithoutCancel(r.Context())
 	reply := func(typ, message string) {
 		b, _ := json.Marshal(map[string]string{"type": typ, "message": message})
 		conn.Write(ctx, websocket.MessageText, b)
 	}
 	m := &mic{conn: conn}
+	window, frames := time.Now(), 0
 	defer func() {
 		s.mmu.Lock()
 		if s.mics[p.Code] == m {
@@ -107,6 +111,13 @@ func (s *Server) micSocket(w http.ResponseWriter, r *http.Request, p store.Party
 			return
 		}
 		if typ == websocket.MessageBinary {
+			// at most 50 frames a second reach the Translator; extra frames are dropped
+			if now := time.Now(); now.Sub(window) >= time.Second {
+				window, frames = now, 0
+			}
+			if frames++; frames > maxMicFrames {
+				continue
+			}
 			if m.sess != nil {
 				if err := m.sess.Audio(raw); err != nil {
 					reply("error", "spojení s Translatorem spadlo")

@@ -80,4 +80,9 @@ CREATE TABLE ideas (
 `,
 	// 2 — M4: animate approved photos automatically (LivePortrait loop per photo)
 	`ALTER TABLE parties ADD COLUMN auto_live INTEGER NOT NULL DEFAULT 0;`,
+	// 3 — the stage connects with its own key (live cameras, D19); existing parties get one now
+	`ALTER TABLE parties ADD COLUMN stage_key TEXT NOT NULL DEFAULT '';
+UPDATE parties SET stage_key = lower(hex(randomblob(16))) WHERE stage_key = '';`,
+	// 4 — /files looks an asset up by its file to check its status (D19)
+	`CREATE INDEX assets_file ON assets(party_code, file);`,
 }

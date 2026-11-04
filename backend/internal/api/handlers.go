@@ -26,7 +26,21 @@ import (
 
 // ── parties ────────────────────────────────────────────────────────────────
 
+// Limits on what a party's guests can pile up (D19). A real party has tens
+// of guests; these only stop a script.
+const (
+	maxGuests            = 400
+	maxNotesPerGuest     = 200
+	maxNotesPerMinute    = 20
+	maxIdeasPerGuest     = 100
+	maxGuestSocketsPerIP = 8
+	maxPartyExtension    = 24 * time.Hour
+)
+
 func (s *Server) createParty(w http.ResponseWriter, r *http.Request) {
+	if s.Cfg.AdminToken == "" && !s.allowIP(w, r, 5) {
+		return
+	}
 	var in struct {
 		Name string `json:"name"`
 	}
@@ -41,7 +55,7 @@ func (s *Server) createParty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pub, _ := s.publicParty(r, p)
-	writeJSON(w, 201, map[string]any{"party": pub, "cockpitToken": p.CockpitToken})
+	writeJSON(w, 201, map[string]any{"party": pub, "cockpitToken": p.CockpitToken, "stageKey": p.StageKey})
 }
 
 func (s *Server) listParties(w http.ResponseWriter, r *http.Request) {
@@ -53,10 +67,11 @@ func (s *Server) listParties(w http.ResponseWriter, r *http.Request) {
 	type row struct {
 		store.Party
 		CockpitToken string `json:"cockpitToken"`
+		StageKey     string `json:"stageKey"`
 	}
 	out := []row{}
 	for _, p := range ps {
-		out = append(out, row{p, p.CockpitToken})
+		out = append(out, row{p, p.CockpitToken, p.StageKey})
 	}
 	writeJSON(w, 200, out)
 }
@@ -124,6 +139,13 @@ func (s *Server) patchParty(w http.ResponseWriter, r *http.Request, p store.Part
 		n := clean(*in.Name, 60)
 		in.Name = &n
 	}
+	if in.EndsAt != nil {
+		now := s.Store.Now()
+		if *in.EndsAt <= now.UnixMilli() || *in.EndsAt > now.Add(maxPartyExtension).UnixMilli() {
+			writeErr(w, 400, "konec party: mezi teď a +24 h")
+			return
+		}
+	}
 	if in.DJfyCode != nil {
 		c := strings.ToUpper(strings.TrimSpace(*in.DJfyCode))
 		if c != "" && !djfyCodeRE.MatchString(c) {
@@ -151,6 +173,9 @@ var djfyCodeRE = regexp.MustCompile(`^[A-Z0-9]{3,12}$`)
 // ── guests ─────────────────────────────────────────────────────────────────
 
 func (s *Server) createGuest(w http.ResponseWriter, r *http.Request, p store.Party) {
+	if !s.partyOpen(w, p) || !s.allowIP(w, r, 2) {
+		return
+	}
 	var in struct {
 		Nickname string `json:"nickname"`
 	}
@@ -158,6 +183,10 @@ func (s *Server) createGuest(w http.ResponseWriter, r *http.Request, p store.Par
 	nick := clean(in.Nickname, 24)
 	if nick == "" {
 		writeErr(w, 400, "zadej přezdívku")
+		return
+	}
+	if n, err := s.Store.GuestCount(r.Context(), p.Code); err != nil || n >= maxGuests {
+		writeErr(w, 409, "party je plná")
 		return
 	}
 	g, err := s.Store.CreateGuest(r.Context(), p.Code, nick)
@@ -239,6 +268,15 @@ func (s *Server) createSticker(w http.ResponseWriter, r *http.Request, p store.P
 		writeErr(w, 400, "napiš vzkaz")
 		return
 	}
+	ctx := r.Context()
+	if n, err := s.Store.GuestPosts(ctx, p.Code, g.ID, "sticker", 0); err != nil || n >= maxNotesPerGuest {
+		writeErr(w, 409, "už jsi napsal dost vzkazů")
+		return
+	}
+	if n, _ := s.Store.GuestPosts(ctx, p.Code, g.ID, "sticker", s.Store.Now().Add(-time.Minute).UnixMilli()); n >= maxNotesPerMinute {
+		writeErr(w, 429, "pomaleji, zeď nestíhá :)")
+		return
+	}
 	if !colorRE.MatchString(in.Color) {
 		in.Color = "#ffd84d"
 	}
@@ -266,6 +304,10 @@ func (s *Server) createIdea(w http.ResponseWriter, r *http.Request, p store.Part
 	text := clean(in.Text, 1000)
 	if utf8.RuneCountInString(text) < 5 {
 		writeErr(w, 400, "námět je moc krátký")
+		return
+	}
+	if n, err := s.Store.GuestIdeas(r.Context(), p.Code, g.ID); err != nil || n >= maxIdeasPerGuest {
+		writeErr(w, 409, "už jsi poslal dost námětů")
 		return
 	}
 	i, err := s.Store.CreateIdea(r.Context(), p.Code, g, text)
@@ -407,6 +449,7 @@ func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitStat
 	st.Config = map[string]any{
 		"restyle": s.Restyler.Name(), "animate": s.Animator.Name(), "moderation": s.Cfg.Moderation,
 		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL, "subtitles": s.Subtitles != nil,
+		"stageKey": p.StageKey,
 	}
 	return st, nil
 }

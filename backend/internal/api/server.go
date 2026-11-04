@@ -52,6 +52,9 @@ type Server struct {
 	smu     sync.Mutex
 	streams map[string]map[string]*Stream // party → stream id → live phone camera
 
+	limits     *limiter // per-IP budget for unauthenticated writes (D19)
+	gameInputs *limiter // per-socket budget for game.input
+
 	mmu  sync.Mutex
 	mics map[string]*mic // party → the MC microphone feeding subtitles
 
@@ -72,6 +75,8 @@ func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
 	s.streams = map[string]map[string]*Stream{}
 	s.mics = map[string]*mic{}
+	s.limits = newLimiter(func() time.Time { return s.Store.Now() }, writeRate, writeBurst)
+	s.gameInputs = newLimiter(time.Now, 30, 30)
 	s.draws, s.games = map[string][]string{}, map[string]*game{}
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
@@ -114,18 +119,18 @@ func (s *Server) Routes() http.Handler {
 	// public / guest
 	mux.HandleFunc("GET /api/parties/{code}", s.party(s.getParty))
 	mux.HandleFunc("POST /api/parties/{code}/guests", s.party(s.createGuest))
-	mux.HandleFunc("PUT /api/parties/{code}/guests/{gid}/play", s.guest(s.setPlay))
+	mux.HandleFunc("PUT /api/parties/{code}/guests/{gid}/play", s.guestWrite(s.setPlay))
 	mux.HandleFunc("GET /api/parties/{code}/guests/{gid}/assets", s.guest(s.guestAssets))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/photos", s.guest(s.uploadPhoto))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stickers", s.guest(s.createSticker))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/ideas", s.guest(s.createIdea))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/reactions", s.guest(s.react))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/search", s.guest(s.musicSearch))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/propose", s.guest(s.musicPropose))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/vote", s.guest(s.musicVote))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stream", s.guest(s.startStream))
-	mux.HandleFunc("DELETE /api/parties/{code}/guests/{gid}/stream", s.guest(s.stopStream))
-	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/dance", s.guest(s.dance))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/photos", s.guestWrite(s.uploadPhoto))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stickers", s.guestWrite(s.createSticker))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/ideas", s.guestWrite(s.createIdea))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/reactions", s.guestWrite(s.react))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/search", s.guestWrite(s.musicSearch))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/propose", s.guestWrite(s.musicPropose))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/music/vote", s.guestWrite(s.musicVote))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stream", s.guestWrite(s.startStream))
+	mux.HandleFunc("DELETE /api/parties/{code}/guests/{gid}/stream", s.guestWrite(s.stopStream))
+	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/dance", s.guestWrite(s.dance))
 	mux.HandleFunc("GET /api/parties/{code}/queue", s.party(s.getQueue))
 	mux.HandleFunc("GET /api/parties/{code}/music", s.party(s.getMusic))
 	mux.HandleFunc("GET /api/parties/{code}/recap", s.party(s.recap))
@@ -213,6 +218,25 @@ func (s *Server) guest(h guestHandler) http.HandlerFunc {
 	})
 }
 
+// guestWrite is guest for everything a phone changes: closed once the party
+// ended (reading and the recap stay), and within the per-IP budget (D19).
+func (s *Server) guestWrite(h guestHandler) http.HandlerFunc {
+	return s.guest(func(w http.ResponseWriter, r *http.Request, p store.Party, g store.Guest) {
+		if !s.partyOpen(w, p) || !s.allowIP(w, r, 1) {
+			return
+		}
+		h(w, r, p, g)
+	})
+}
+
+func (s *Server) partyOpen(w http.ResponseWriter, p store.Party) bool {
+	if p.EndsAt <= s.Store.Now().UnixMilli() {
+		writeErr(w, 410, "party skončila")
+		return false
+	}
+	return true
+}
+
 func bearer(r *http.Request) string {
 	if t := r.URL.Query().Get("token"); t != "" {
 		return t
@@ -275,10 +299,19 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := hub.Role(r.URL.Query().Get("role"))
-	peer := hub.Peer{ID: "p" + randHex(6), Role: role}
+	peer := hub.Peer{ID: "p" + randHex(6), Role: role, IP: s.clientIP(r)}
 	switch role {
 	case hub.Stage:
+		// the stage sees and calls every live camera: it needs its key (D19)
+		if !eq(r.URL.Query().Get("key"), p.StageKey) {
+			writeErr(w, 401, "neplatný klíč plátna")
+			return
+		}
 	case hub.Guest:
+		if s.Hub.Count(p.Code, func(c hub.Peer) bool { return c.Role == hub.Guest && c.IP == peer.IP }) >= maxGuestSocketsPerIP {
+			writeErr(w, 429, "z tohohle zařízení je otevřeno moc oken")
+			return
+		}
 		// the guest id is the guest's secret; only a known one is attached
 		if gid := r.URL.Query().Get("guest"); gid != "" {
 			if g, err := s.Store.Guest(r.Context(), p.Code, gid); err == nil {

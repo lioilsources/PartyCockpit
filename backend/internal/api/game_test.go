@@ -19,7 +19,7 @@ func TestGuestIDsStayPrivate(t *testing.T) {
 	e.waitAsset(g.ID, photo.ID, "pending")
 	e.do("POST", "/api/parties/"+e.code+"/assets/"+photo.ID+"/approve", nil, nil)
 
-	stage := e.dial("role=stage")
+	stage := e.dial("role=stage&key=" + e.key)
 	q := stage.waitFor("queue", func(d json.RawMessage) bool { return len(d) > 4 })
 	res, _ := http.Get(e.ts.URL + "/api/parties/" + e.code + "/queue")
 	pub, _ := io.ReadAll(res.Body)
@@ -58,7 +58,7 @@ func TestIntermissionGame(t *testing.T) {
 	if st := e.do("POST", "/api/parties/"+e.code+"/game", nil, nil); st != 409 {
 		t.Fatalf("a game without a draw: %d, want 409", st)
 	}
-	stage := e.dial("role=stage")
+	stage := e.dial("role=stage&key=" + e.key)
 	stage.waitFor("party", nil)
 	phones := map[string]*sock{}
 	for _, id := range ids {

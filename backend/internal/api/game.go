@@ -120,6 +120,10 @@ func (s *Server) onGameInput(code string, from hub.Peer, raw []byte) {
 	if from.Role != hub.Guest || from.GuestID == "" {
 		return
 	}
+	// 30 a second is smoother than any phone's touch events; the rest is dropped (D19)
+	if !s.gameInputs.allow(from.ID, 1) {
+		return
+	}
 	var env struct {
 		Data struct {
 			X float64 `json:"x"`

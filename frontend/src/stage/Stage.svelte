@@ -27,6 +27,18 @@
 
   let { code }: { code: string } = $props();
 
+  // The stage key (D19) comes once in ?key= from the Cockpit, then lives in
+  // localStorage, so the URL on the TV carries no secret.
+  const keyStore = `pc.stage.key.${code}`;
+  const qsKey = new URLSearchParams(location.search).get('key');
+  if (qsKey) {
+    store.set(keyStore, qsKey);
+    const u = new URL(location.href);
+    u.searchParams.delete('key');
+    history.replaceState(null, '', u.pathname + u.search);
+  }
+  const stageKey = qsKey ?? store.get(keyStore) ?? '';
+
   // The stage survives a backend outage (plan §8): last state is cached and the
   // scenes keep running on what they already have.
   const cacheKey = `pc.stage.${code}`;
@@ -110,6 +122,7 @@
       save();
     },
     (o) => (online = o),
+    { key: stageKey },
   );
 
   // Audio-input beat detection when ?audio=1 (Chrome kiosk with
@@ -215,6 +228,7 @@
     <QrOverlay url={party.joinUrl} code={party.code} />
   {/if}
   {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}
+  {#if !stageKey}<div class="nokey">Plátno otevři tlačítkem „Otevřít plátno“ v Cockpitu (nese klíč).</div>{/if}
   {#if needsAudioClick}<div class="hint">klikni pro zapnutí mikrofonu (beat)</div>{/if}
 </div>
 
@@ -252,6 +266,17 @@
     border-radius: 50%;
     background: var(--red);
     opacity: 0.7;
+  }
+  .nokey {
+    position: absolute;
+    left: 50%;
+    bottom: 3vw;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    padding: 1vw 2vw;
+    border-radius: 1vw;
+    font-size: 1.6vw;
+    z-index: 40;
   }
   .hint {
     position: absolute;

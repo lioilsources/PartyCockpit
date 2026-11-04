@@ -17,6 +17,9 @@ type Config struct {
 	DataDir   string // PC_DATA_DIR
 	// AdminToken guards POST /api/parties. Empty = anyone on the LAN may create a party.
 	AdminToken string
+	// TrustProxy: take the client IP from X-Forwarded-For (PC_TRUST_PROXY=1),
+	// only when a reverse proxy sits in front; rate limits key on it.
+	TrustProxy bool
 	PartyTTL   time.Duration // PC_PARTY_TTL, how long a party lives; files are purged 7 days after
 	Workers    int           // PC_WORKERS, concurrent GPU jobs
 
@@ -73,6 +76,7 @@ func Load() Config {
 		PublicURL:                strings.TrimRight(env("PC_PUBLIC_URL", ""), "/"),
 		DataDir:                  env("PC_DATA_DIR", "./data"),
 		AdminToken:               env("PC_ADMIN_TOKEN", ""),
+		TrustProxy:               env("PC_TRUST_PROXY", "") == "1",
 		PartyTTL:                 dur("PC_PARTY_TTL", 24*time.Hour),
 		Workers:                  num("PC_WORKERS", 2),
 		TLSAddr:                  env("PC_TLS_ADDR", ":8443"),

@@ -26,6 +26,7 @@ type env struct {
 	ts    *httptest.Server
 	code  string
 	token string
+	key   string // stage key
 	srv   *Server
 }
 
@@ -61,9 +62,10 @@ func newEnv(t *testing.T) *env {
 			Code string `json:"code"`
 		} `json:"party"`
 		CockpitToken string `json:"cockpitToken"`
+		StageKey     string `json:"stageKey"`
 	}
 	e.do("POST", "/api/parties", map[string]any{"name": "test"}, &p)
-	e.code, e.token = p.Party.Code, p.CockpitToken
+	e.code, e.token, e.key = p.Party.Code, p.CockpitToken, p.StageKey
 	return e
 }
 
@@ -186,7 +188,7 @@ func TestStreamSignalling(t *testing.T) {
 	phone := e.dial("role=streamer&key=" + start.Key)
 	phone.waitFor("stream", nil)
 
-	stage := e.dial("role=stage")
+	stage := e.dial("role=stage&key=" + e.key)
 	stage.waitFor("streams", nil)
 
 	// pending: the stage's offer must not reach the phone

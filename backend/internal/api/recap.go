@@ -80,6 +80,9 @@ func (s *Server) recapURL(r *http.Request, code string) string {
 
 // recapZip streams every approved file plus the stickers as text.
 func (s *Server) recapZip(w http.ResponseWriter, r *http.Request, p store.Party) {
+	if !s.allowIP(w, r, 10) { // the zip streams every file of the party
+		return
+	}
 	q, err := s.Store.StageQueue(r.Context(), p.Code)
 	if err != nil {
 		writeErr(w, 500, err.Error())

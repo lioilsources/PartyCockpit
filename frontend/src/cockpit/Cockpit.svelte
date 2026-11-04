@@ -298,9 +298,13 @@
         </span>
       </div>
       <div class="links">
-        <a href={`/stage/${code}`} target="_blank">Otevřít plátno ↗</a>
+        <a href={`/stage/${code}?key=${st?.config.stageKey ?? ''}`} target="_blank">Otevřít plátno ↗</a>
         <a href={party.joinUrl} target="_blank">{party.joinUrl}</a>
       </div>
+      <span class="ends">
+        končí {new Date(party.endsAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+        <button onclick={() => party && patch({ endsAt: Math.min(Date.now() + 24 * 3600e3 - 60e3, Math.max(party.endsAt, Date.now()) + 2 * 3600e3) })}>+2 h</button>
+      </span>
       <button class="bad panic" onclick={panic}>PANIC</button>
     </header>
     {#if err}<p class="err">{err}</p>{/if}
@@ -667,6 +671,13 @@
   }
   h2 strong {
     color: var(--yellow);
+  }
+  .ends {
+    color: var(--muted);
+    font-size: 14px;
+    display: flex;
+    gap: 6px;
+    align-items: center;
   }
   .preflight {
     background: var(--panel);

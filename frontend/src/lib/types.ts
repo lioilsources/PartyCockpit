@@ -89,7 +89,7 @@ export type CockpitState = {
   ideas: Idea[];
   jobs: { intent: string; status: string; count: number; avgMs: number }[];
   clients: Record<string, number>;
-  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string; subtitles: boolean };
+  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string; subtitles: boolean; stageKey: string };
 };
 
 export const fileUrl = (code: string, file?: string) => (file ? `/files/${code}/${file}` : '');

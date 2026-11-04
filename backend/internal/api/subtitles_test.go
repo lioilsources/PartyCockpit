@@ -15,7 +15,7 @@ import (
 
 func TestSubtitles(t *testing.T) {
 	e := newEnv(t)
-	stage := e.dial("role=stage")
+	stage := e.dial("role=stage&key=" + e.key)
 	stage.waitFor("party", nil)
 
 	// without a Translator the microphone is refused, typed lines still work

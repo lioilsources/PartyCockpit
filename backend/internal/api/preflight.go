@@ -51,7 +51,7 @@ func (s *Server) preflight(w http.ResponseWriter, r *http.Request, p store.Party
 	if counts[hub.Stage] > 0 {
 		add("stage", "Plátno", "ok", fmt.Sprintf("připojeno (%d)", counts[hub.Stage]))
 	} else {
-		add("stage", "Plátno", "fail", "žádné plátno není připojené. Otevři /stage/"+p.Code+" na TV.")
+		add("stage", "Plátno", "fail", "žádné plátno není připojené. Na TV ho otevři tlačítkem „Otevřít plátno“ (odkaz nese klíč plátna).")
 	}
 
 	// GPU providers, probed in parallel (each at most a few seconds)
