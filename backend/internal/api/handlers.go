@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -229,6 +231,7 @@ func (s *Server) createSticker(w http.ResponseWriter, r *http.Request, p store.P
 	var in struct {
 		Text  string `json:"text"`
 		Color string `json:"color"`
+		Sheet string `json:"sheet"`
 	}
 	readJSON(r, &in)
 	text := clean(in.Text, 140)
@@ -239,7 +242,11 @@ func (s *Server) createSticker(w http.ResponseWriter, r *http.Request, p store.P
 	if !colorRE.MatchString(in.Color) {
 		in.Color = "#ffd84d"
 	}
-	meta, _ := json.Marshal(map[string]string{"text": text, "nickname": g.Nickname, "color": in.Color})
+	m := map[string]string{"text": text, "nickname": g.Nickname, "color": in.Color}
+	if s.Glyphs.Has(in.Sheet) {
+		m["sheet"] = in.Sheet // handwriting the guest picked (D16)
+	}
+	meta, _ := json.Marshal(m)
 	a, err := s.Store.CreateAsset(r.Context(), store.Asset{PartyCode: p.Code, GuestID: g.ID, Kind: "sticker", Meta: meta, Status: "pending"})
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -329,7 +336,27 @@ func (s *Server) getQueue(w http.ResponseWriter, r *http.Request, p store.Party)
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, q)
+	writeJSON(w, 200, publicQueue(q))
+}
+
+// publicQueue hides who made what: a guest's id is the key to their phone's
+// endpoints (/guests/{gid}/…), and the queue goes to anyone with the party
+// code. A one-way tag still tells one guest's items from another's.
+func publicQueue(q []store.Asset) []store.Asset {
+	out := make([]store.Asset, len(q))
+	for i, a := range q {
+		a.GuestID = guestTag(a.GuestID)
+		out[i] = a
+	}
+	return out
+}
+
+func guestTag(id string) string {
+	if id == "" {
+		return ""
+	}
+	h := sha256.Sum256([]byte("partycockpit-guest:" + id))
+	return "g" + hex.EncodeToString(h[:6])
 }
 
 func (s *Server) reorderQueue(w http.ResponseWriter, r *http.Request, p store.Party) {
@@ -350,7 +377,7 @@ func (s *Server) reorderQueue(w http.ResponseWriter, r *http.Request, p store.Pa
 
 func (s *Server) pushQueue(ctx context.Context, code string) {
 	if q, err := s.Store.StageQueue(ctx, code); err == nil {
-		s.Hub.Broadcast(code, hub.Msg{Type: "queue", Data: q}, hub.Stage, hub.Cockpit)
+		s.Hub.Broadcast(code, hub.Msg{Type: "queue", Data: publicQueue(q)}, hub.Stage, hub.Cockpit)
 	}
 }
 
@@ -418,6 +445,7 @@ var sceneKinds = map[string]bool{
 	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
 	"webtoon": true, "lottery": true, "blank": true, "pipwall": true, "dance": true,
 	"interlude": true, "recap": true, "stylesweep": true, // M7
+	// "game" is set only by POST /game, which knows the players
 }
 
 func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party) {
@@ -445,6 +473,7 @@ func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
 	}
 	s.unliveAll(p.Code)
 	s.stopMic(p.Code)
+	s.endGame(p.Code)
 	s.Hub.Broadcast(p.Code, hub.Msg{Type: "panic", Data: nil})
 	s.broadcastParty(r, p.Code)
 	w.WriteHeader(204)
@@ -485,9 +514,12 @@ func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) 
 		j, _ := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
 		pool[i], pool[j.Int64()] = pool[j.Int64()], pool[i]
 	}
+	// the scene goes to every screen and phone: nicknames only, never guest ids
 	winners := []map[string]string{}
+	var ids []string
 	for _, g := range pool[:min(in.Count, len(pool))] {
-		winners = append(winners, map[string]string{"id": g.ID, "nickname": g.Nickname})
+		winners = append(winners, map[string]string{"nickname": g.Nickname})
+		ids = append(ids, g.ID)
 	}
 	draw := map[string]any{"game": clean(in.Game, 40), "candidates": cands, "winners": winners, "at": time.Now().UnixMilli()}
 	params, _ := json.Marshal(draw)
@@ -496,8 +528,9 @@ func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) 
 		return
 	}
 	s.broadcastParty(r, p.Code)
-	for _, wnr := range winners {
-		s.Hub.Broadcast(p.Code, hub.Msg{Type: "lottery.won", Data: map[string]string{"guestId": wnr["id"], "game": clean(in.Game, 40)}}, hub.Guest)
+	s.setDraw(p.Code, ids)
+	for _, id := range ids {
+		s.Hub.SendTo(p.Code, hub.Msg{Type: "lottery.won", Data: map[string]string{"game": clean(in.Game, 40)}}, isGuest(id))
 	}
 	writeJSON(w, 200, draw)
 }

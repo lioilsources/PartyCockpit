@@ -21,6 +21,7 @@
   import Recap from './scenes/Recap.svelte';
   import Subtitles from './Subtitles.svelte';
   import StyleSweep from './scenes/StyleSweep.svelte';
+  import Kruh from './scenes/Kruh.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
 
@@ -43,6 +44,7 @@
   let online = $state(false);
   let reactions: Reactions;
   let subtitles: Subtitles;
+  let kruh = $state<Kruh | null>(null);
   let pulse = $state(false);
   let needsAudioClick = $state(false);
   let streams = $state<LiveStream[]>([]);
@@ -91,6 +93,9 @@
           return;
         case 'subtitle.clear':
           subtitles?.clear();
+          return;
+        case 'game.input':
+          kruh?.input(m.data.slot, m.data.x);
           return;
         case 'streams':
           streams = m.data ?? [];
@@ -172,7 +177,7 @@
       {:else if scene.kind === 'nowplaying'}
         <NowPlaying {music} joinUrl={party?.joinUrl ?? ''} {clock} />
       {:else if scene.kind === 'webtoon'}
-        <Webtoon params={scene.params} />
+        <Webtoon params={scene.params} {code} {queue} title={party?.name ?? ''} />
       {:else if scene.kind === 'lottery'}
         <Lottery params={scene.params} />
       {:else if scene.kind === 'dance'}
@@ -181,6 +186,8 @@
         <Interlude params={scene.params} name={party?.name ?? ''} {clock} />
       {:else if scene.kind === 'recap'}
         <Recap {code} {party} {queue} params={scene.params} {clock} />
+      {:else if scene.kind === 'game'}
+        <Kruh bind:this={kruh} params={scene.params} {clock} />
       {:else if scene.kind === 'stylesweep'}
         <StyleSweep params={scene.params} {clock} />
       {:else if scene.kind === 'pipwall'}
@@ -204,7 +211,7 @@
   {#if scene.kind !== 'nowplaying'}
     <NowPlayingBar {music} />
   {/if}
-  {#if party && scene.kind !== 'lottery' && scene.kind !== 'recap'}
+  {#if party && scene.kind !== 'lottery' && scene.kind !== 'recap' && scene.kind !== 'game'}
     <QrOverlay url={party.joinUrl} code={party.code} />
   {/if}
   {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}

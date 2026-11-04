@@ -27,6 +27,7 @@ type Peer struct {
 	ID       string // random per connection; viewers are addressed by it
 	Role     Role
 	StreamID string // Streamer only
+	GuestID  string // Guest only, when the phone said who it is (?guest=, verified)
 }
 
 // Handlers receive what clients send. Both may be nil.

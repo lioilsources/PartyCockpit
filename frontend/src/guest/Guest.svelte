@@ -8,6 +8,10 @@
   import Live from './Live.svelte';
   import Dance from './Dance.svelte';
   import Clip from '../lib/Clip.svelte';
+  import Handwritten from '../lib/Handwritten.svelte';
+  import Pad from './Pad.svelte';
+  import type { Socket } from '../lib/ws';
+  import { listSheets, type SheetInfo } from '../lib/handwriting';
 
   let { code }: { code: string } = $props();
 
@@ -22,6 +26,7 @@
   let tab = $state<'photo' | 'live' | 'music' | 'note' | 'idea' | 'play'>('photo');
   let toast = $state('');
   let won = $state('');
+  let slot = $state<{ slot: number; color: string } | null>(null); // playing the intermission game (D17)
 
   api.get<Party>(`/api/parties/${code}`).then((p) => (party = p)).catch((e) => (notFound = e.status === 404, err = e.message));
 
@@ -32,6 +37,8 @@
       store.set(key, JSON.stringify(guest));
       store.set('pc.nick', nick);
       refresh();
+      sock.close();
+      sock = openSock();
     } catch (e: any) {
       err = e.message;
     }
@@ -55,17 +62,26 @@
   }
   refresh();
 
-  const sock = connect(
-    code,
-    'guest',
-    (m) => {
-      if (m.type === 'party') party = m.data;
-      else if (m.type === 'music') music = m.data;
-      else if (m.type === 'asset.updated') refresh();
-      else if (m.type === 'lottery.won' && m.data.guestId === guest?.id) won = m.data.game || 'hru';
-    },
-    () => {},
-  );
+  // the socket says who the phone is (lottery win, game slot), so it reopens after joining
+  let sock: Socket = openSock();
+  function openSock() {
+    return connect(
+      code,
+      'guest',
+      (m) => {
+        if (m.type === 'party') party = m.data;
+        else if (m.type === 'music') music = m.data;
+        else if (m.type === 'asset.updated') refresh();
+        else if (m.type === 'lottery.won') won = m.data.game || 'hru'; // sent to the winner's phone only
+        else if (m.type === 'game.slot') {
+          slot = m.data;
+          tab = 'play';
+        } else if (m.type === 'game.end') slot = null;
+      },
+      () => {},
+      guest ? { guest: guest.id } : {},
+    );
+  }
   // also poll while something is being painted (the WS ping may be lost on mobile)
   const poll = setInterval(() => {
     if (mine.some((a) => a.status === 'processing')) refresh();
@@ -92,9 +108,20 @@
   let note = $state('');
   let noteColor = $state('#ffd84d');
   const noteColors = ['#ffd84d', '#ff8fb8', '#8fe3ff', '#a6ff8f', '#ffb36b'];
+  // handwriting (D16): a few sheets to pick from, previewed live on the note
+  let hands = $state<SheetInfo[]>([]);
+  let hand = $state(store.get('pc.hand') ?? '');
+  listSheets().then((list) => {
+    // a short, varied choice: the default and the rest of the handwriting first
+    hands = [...list.filter((x) => x.category === 'handwriting'), ...list.filter((x) => x.category === 'kids')].slice(0, 10);
+    if (hands.length && !hands.some((x) => x.id === hand)) hand = (hands.find((x) => x.default) ?? hands[0]).id;
+  });
+  $effect(() => {
+    if (hand) store.set('pc.hand', hand);
+  });
   async function sendNote() {
     try {
-      await api.post(g('/stickers'), { text: note, color: noteColor });
+      await api.post(g('/stickers'), { text: note, color: noteColor, sheet: hand });
       note = '';
       say('Vzkaz odeslán, objeví se po schválení ✍️');
       refresh();
@@ -181,6 +208,16 @@
             <button class="sw" class:sel={noteColor === c} style:background={c} onclick={() => (noteColor = c)} aria-label={c}></button>
           {/each}
         </div>
+        {#if hands.length}
+          <div class="hands">
+            {#each hands as h (h.id)}
+              <button class:sel={hand === h.id} onclick={() => (hand = h.id)}>{h.name}</button>
+            {/each}
+          </div>
+          <div class="preview" style:background={noteColor}>
+            <Handwritten text={note.trim() || 'Všechno nejlepší! 🎂'} sheet={hand} cell={30} width={260} density={2} />
+          </div>
+        {/if}
         <button class="primary wide" disabled={!note.trim()} onclick={sendNote}>Nalepit na zeď</button>
       {:else if tab === 'idea'}
         <h2>Námět na webtoon</h2>
@@ -188,6 +225,11 @@
         <textarea bind:value={idea} maxlength="1000" rows="5" placeholder="Olin omylem pozve na party mimozemšťany…"></textarea>
         <button class="primary wide" disabled={idea.trim().length < 5} onclick={sendIdea}>Poslat námět</button>
       {:else if tab === 'play'}
+        {#if slot}
+          <h2>Hraješ! <span style:color={slot.color}>●</span></h2>
+          <p class="muted">Tvoje pálka má na plátně tuhle barvu. Táhni prstem doleva a doprava.</p>
+          <Pad color={slot.color} send={(x) => sock.send({ type: 'game.input', data: { x } })} />
+        {/if}
         <h2>Hry o přestávce</h2>
         <p class="muted">Kdo bude hrát, se losuje. Přihlas se do osudí.</p>
         {#if guest.wantsToPlay}
@@ -292,6 +334,33 @@
   .wide {
     width: 100%;
     padding: 0.9em;
+  }
+  .hands {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 0 8px;
+  }
+  .hands button {
+    flex: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 14px;
+  }
+  .hands button.sel {
+    border-color: var(--yellow);
+    color: var(--yellow);
+  }
+  .preview {
+    color: #1d1208;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    min-height: 60px;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    transform: rotate(-1.5deg);
   }
   .colors {
     display: flex;

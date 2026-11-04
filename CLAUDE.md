@@ -8,7 +8,7 @@ Party show na plátno: Stage (TV), Cockpit (operátor), Guest (telefon přes QR)
 ```sh
 make build      # npm build → embed do backend/internal/web/dist → bin/partycockpit
 make run        # s .env
-make dev        # backend :8098 + vite :5173 (proxy /api /ws /files /webtoon /stylemaps)
+make dev        # backend :8098 + vite :5173 (proxy /api /ws /files /webtoon /stylemaps /glyphs)
 make check      # go vet + go test + svelte-check + vite build — brána před pushem
 make styles     # přegeneruje katalog stylů z ../Restyler
 ```
@@ -25,6 +25,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `backend/internal/api/streams.go` — živé streamy: registry + WebRTC signalizace (P2P, LAN)
 - `backend/internal/api/recap.go`, `preflight.go` — M7: recap + zip, kontroly „Před party“
 - `backend/internal/subtitles` + `api/subtitles.go` — titulky přes Translator; `frontend/src/lib/mic.ts` VAD
+- `backend/internal/glyphs` + `frontend/src/lib/handwriting.ts` — ručně psané vzkazy; `api/game.go` + `stage/scenes/Kruh.svelte` hra
 - `backend/internal/djfy` — klient DJfy relay (SSE + guest zprávy)
 - `backend/internal/gallery` — FineTuneGallery list + disková cache obrázků
 - `frontend/src/stage` — scény (`scenes/*.svelte`), overlaye, PixiJS reakce
@@ -41,6 +42,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - Živý stream jde na plátno až po „pustit“ v Cockpitu. Server plátnu neposílá pending streamy.
 - GPU se nečeká synchronně: upload vrátí 202, job běží ve worker poolu.
 - Limit 1 rozpracovaný restyle na hosta.
+- ID hosta je jeho tajný klíč: nikdy do fronty, scén ani zpráv pro ostatní (D17).
 - Repo je veřejné: žádné LAN IP, tokeny, domácí cesty. Vše přes `.env` (`.env.example`).
 - Migrace, které už vyšly, se needitují; přidává se nová na konec `migrations`.
 - Stage musí přežít výpadek backendu: cache stavu v localStorage, scény jedou dál.
@@ -50,4 +52,4 @@ SQLite místo Postgres (přenosný party box), port 8098, restyle přes Restyler
 stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit, animace přímo přes ComfyUI. Detail v `DECISIONS.md` D2, D11–D13.
 
 ## Kam dál
-`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, M5 3D, M7 naostro, HandWrittenStickers.
+`STATUS.md`: ostrý test, M3 MirrorBooth stream, M4 na L40S, M5 3D.

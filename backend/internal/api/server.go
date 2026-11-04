@@ -20,6 +20,7 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/config"
 	"github.com/lioilsources/PartyCockpit/backend/internal/djfy"
 	"github.com/lioilsources/PartyCockpit/backend/internal/gallery"
+	"github.com/lioilsources/PartyCockpit/backend/internal/glyphs"
 	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
@@ -36,6 +37,7 @@ type Server struct {
 	Restyler   providers.Restyler
 	Animator   providers.Animator
 	Subtitles  *subtitles.Client // nil = typed subtitles only
+	Glyphs     *glyphs.Set       // nil = notes in a font
 	Classifier providers.Classifier
 	Web        fs.FS // built frontend (may be empty in dev)
 
@@ -52,6 +54,10 @@ type Server struct {
 
 	mmu  sync.Mutex
 	mics map[string]*mic // party → the MC microphone feeding subtitles
+
+	gmu   sync.Mutex
+	draws map[string][]string // party → guest ids of the last lottery draw
+	games map[string]*game    // party → the intermission game in progress
 }
 
 // Tempo drives every scene's tick(beat). Source: tap | djfy | none; the stage
@@ -66,6 +72,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
 	s.streams = map[string]map[string]*Stream{}
 	s.mics = map[string]*mic{}
+	s.draws, s.games = map[string][]string{}, map[string]*game{}
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
@@ -136,6 +143,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/panic", s.cockpit(s.panic))
 	mux.HandleFunc("POST /api/parties/{code}/tempo", s.cockpit(s.setTempo))
 	mux.HandleFunc("POST /api/parties/{code}/lottery", s.cockpit(s.lottery))
+	mux.HandleFunc("POST /api/parties/{code}/game", s.cockpit(s.startGame))
+	mux.HandleFunc("DELETE /api/parties/{code}/game", s.cockpit(s.stopGame))
 	mux.HandleFunc("GET /api/parties/{code}/ideas", s.cockpit(s.listIdeas))
 	mux.HandleFunc("GET /api/parties/{code}/streams", s.cockpit(s.listStreams))
 	mux.HandleFunc("GET /api/parties/{code}/preflight", s.cockpit(s.preflight))
@@ -155,6 +164,14 @@ func (s *Server) Routes() http.Handler {
 		s.Gallery.ServeFile(w, r, r.PathValue("kind"), r.PathValue("sha"))
 	})
 	mux.HandleFunc("GET /stylemaps/{rel...}", func(w http.ResponseWriter, r *http.Request) { s.Gallery.ServeStyleMap(w, r, r.PathValue("rel")) })
+	mux.HandleFunc("GET /api/glyphs", func(w http.ResponseWriter, r *http.Request) {
+		if s.Glyphs == nil {
+			writeJSON(w, 200, []glyphs.Sheet{})
+			return
+		}
+		writeJSON(w, 200, s.Glyphs.Sheets)
+	})
+	mux.HandleFunc("GET /glyphs/{id}/{file}", func(w http.ResponseWriter, r *http.Request) { s.Glyphs.Serve(w, r, r.PathValue("id"), r.PathValue("file")) })
 	mux.HandleFunc("GET /api/webtoon", s.listWebtoon)
 	mux.HandleFunc("GET /webtoon/{ep}/{file}", s.serveWebtoon)
 
@@ -260,7 +277,14 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 	role := hub.Role(r.URL.Query().Get("role"))
 	peer := hub.Peer{ID: "p" + randHex(6), Role: role}
 	switch role {
-	case hub.Stage, hub.Guest:
+	case hub.Stage:
+	case hub.Guest:
+		// the guest id is the guest's secret; only a known one is attached
+		if gid := r.URL.Query().Get("guest"); gid != "" {
+			if g, err := s.Store.Guest(r.Context(), p.Code, gid); err == nil {
+				peer.GuestID = g.ID
+			}
+		}
 	case hub.Cockpit:
 		if !eq(bearer(r), p.CockpitToken) {
 			writeErr(w, 401, "neplatný cockpit token")
@@ -292,6 +316,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 	}
 	hello = append(hello, hub.Msg{Type: "hello", Data: map[string]string{"peer": peer.ID}})
 	hello = append(hello, s.streamHello(p.Code, peer)...)
+	hello = append(hello, s.gameHello(p.Code, peer)...)
 	s.Hub.Serve(context.WithoutCancel(r.Context()), conn, p.Code, peer, hello, hub.Handlers{OnMsg: s.onMsg, OnLeave: s.onLeave})
 }
 
@@ -307,7 +332,7 @@ func (s *Server) helloFor(r *http.Request, p store.Party, role hub.Role) ([]hub.
 		if err != nil {
 			return nil, err
 		}
-		msgs = append(msgs, hub.Msg{Type: "queue", Data: q})
+		msgs = append(msgs, hub.Msg{Type: "queue", Data: publicQueue(q)})
 	}
 	if snap := s.DJfy.Snapshot(p.Code); snap != nil {
 		msgs = append(msgs, hub.Msg{Type: "music", Data: snap})

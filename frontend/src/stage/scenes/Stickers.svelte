@@ -3,10 +3,15 @@
   import { ShowQueue } from '../../lib/showqueue';
   import type { BeatClock } from '../../lib/beat';
   import type { Asset } from '../../lib/types';
+  import Handwritten from '../../lib/Handwritten.svelte';
 
-  // Sticker Wall: guests' messages as handwritten notes. HandWrittenStickers has
-  // no HTTP API yet, so the "handwriting" is the Caveat font (DECISIONS.md D11).
+  // Sticker Wall: guests' messages as handwritten notes. With a glyph sheet
+  // (meta.sheet, D16) the note is drawn from HandWrittenStickers letters, else in
+  // the Caveat font (D11).
   let { queue, loopMode, clock }: { queue: Asset[]; loopMode: 'loop' | 'shuffle'; clock: BeatClock } = $props();
+
+  // note content box ≈ 11.6vw wide, letters ≈ 3.2vw tall; drawn 2× for the focus zoom
+  const vw = innerWidth / 100;
 
   const notes = $derived(queue.filter((a) => a.kind === 'sticker').slice(-24));
   const picker = new ShowQueue<Asset>();
@@ -33,7 +38,11 @@
 <div class="wall">
   {#each notes as n, i (n.id)}
     <div class="note" class:focus={focus === n.id} style={layout(n.id, i)} style:background={n.meta.color ?? '#ffd84d'}>
-      <p>{n.meta.text}</p>
+      {#if n.meta.sheet}
+        <Handwritten text={n.meta.text ?? ''} sheet={n.meta.sheet} cell={3.2 * vw} width={11.6 * vw} density={2.2} />
+      {:else}
+        <p>{n.meta.text}</p>
+      {/if}
       <span>— {n.meta.nickname}</span>
     </div>
   {:else}

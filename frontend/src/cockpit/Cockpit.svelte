@@ -334,13 +334,12 @@
           <label><input type="checkbox" bind:checked={sweepTransition} /> přechod přes StyleMap</label>
         {/if}
         <a href={recapUrl(party.joinUrl)} target="_blank">recap pro hosty ↗</a>
-        {#if episodes.length}
-          <label>epizoda
-            <select bind:value={episode}>
-              {#each episodes as e (e.id)}<option value={e.id}>{e.title}</option>{/each}
-            </select>
-          </label>
-        {/if}
+        <label>epizoda
+          <select bind:value={episode}>
+            {#each episodes as e (e.id)}<option value={e.id}>{e.title}</option>{/each}
+            <option value="party">🎉 Party epizoda (z galerie)</option>
+          </select>
+        </label>
       </div>
     </section>
 
@@ -570,6 +569,13 @@
           <input type="number" min="1" max="8" bind:value={lotCount} style="max-width: 70px" />
           <button class="primary">Losovat</button>
         </form>
+        <div class="row">
+          <button onclick={() => act(() => api.post(p('/game'), {}, token))}>⭕ Spustit Kruh s vylosovanými</button>
+          {#if party.scene.kind === 'game'}
+            <button onclick={() => act(async () => { await api.del(p('/game'), token); setScene('blank'); })}>Konec hry</button>
+          {/if}
+        </div>
+        <p class="muted small">Kruh: každý hráč brání svůj oblouk pálkou z telefonu, 3 životy, vyhrává poslední. Když telefon zmlkne, hraje za něj autopilot.</p>
       </section>
 
       <section>

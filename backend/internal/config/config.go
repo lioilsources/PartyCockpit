@@ -58,6 +58,10 @@ type Config struct {
 	TranslatorURL   string // TRANSLATOR_URL
 	TranslatorToken string // TRANSLATOR_TOKEN
 
+	// GlyphsDir is HandWrittenStickers' assets/glyphs (sheets.json + one dir per
+	// sheet). Empty = sticker notes in the Caveat font (D16).
+	GlyphsDir string // PC_GLYPHS_DIR
+
 	// Moderation classifier: "none" (everything waits for the operator) or "aistack" (WD14 tagger).
 	Moderation     string  // MODERATION
 	AutoApproveMax float64 // SFW_AUTO_APPROVE_MAX, NSFW score at or below which relaxed mode auto-approves
@@ -92,6 +96,7 @@ func Load() Config {
 		AnimWorkers:              num("PC_ANIM_WORKERS", 1),
 		TranslatorURL:            strings.TrimRight(env("TRANSLATOR_URL", ""), "/"),
 		TranslatorToken:          env("TRANSLATOR_TOKEN", ""),
+		GlyphsDir:                env("PC_GLYPHS_DIR", ""),
 		Moderation:               env("MODERATION", "none"),
 		AutoApproveMax:           flt("SFW_AUTO_APPROVE_MAX", 0.15),
 	}

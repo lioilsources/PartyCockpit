@@ -77,6 +77,20 @@ na mocku všechny scény, ruční titulky, StyleMap scéna i přechod (lokální
 **Neověřeno:** mikrofon v prohlížeči se skutečným Translatorem, reálné balíčky
 z FineTuneGallery (za CF Access), výkon shaderů na TV a mini PC.
 
+## 2026-11-04: menší věci (vzkazy, hra, party epizoda)
+
+| Část | Stav |
+|---|---|
+| ručně psané vzkazy ze sad HandWrittenStickers, výběr písma s náhledem v telefonu | ✅ |
+| hra Kruh: plátno, ovladač v telefonu, start z Cockpitu, autopilot, PANIC | ✅ |
+| party epizoda webtoonu ze schválených fotek a vzkazů | ✅ |
+| oprava: ID hostů už nejdou ve frontě ani v losování | ✅ test |
+
+Ověřeno: Go testy (sady písmen, hra, soukromí ID) a v Chrome zeď vzkazů v šesti
+písmech, Kruh se 4 a 3 hráči na autopilotu (ztráta životů, vypadnutí), ovladač
+v telefonu a party epizoda. **Neověřeno:** hra s několika skutečnými telefony
+naráz (latence na Wi-Fi), konec hry s vyhlášením vítěze.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
@@ -84,6 +98,4 @@ z FineTuneGallery (za CF Access), výkon shaderů na TV a mini PC.
 4. M4 dokončit: domluvit v L40S session okno s ComfyUI (profil D) a ověřit
    `ANIMATE_PROVIDER=comfy` celou cestou (telefon → Cockpit → plátno). Prověřit licenci
    vah LivePortrait pro B2B.
-5. HandWrittenStickers jako HTTP služba (glyph extraktor).
-6. Hry o přestávce (Three.js, co-op), napojené na výsledek losování.
-7. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.
+5. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.

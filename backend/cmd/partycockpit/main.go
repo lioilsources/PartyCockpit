@@ -16,6 +16,7 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/config"
 	"github.com/lioilsources/PartyCockpit/backend/internal/djfy"
 	"github.com/lioilsources/PartyCockpit/backend/internal/gallery"
+	"github.com/lioilsources/PartyCockpit/backend/internal/glyphs"
 	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
@@ -65,6 +66,12 @@ func run() error {
 	if cfg.TranslatorURL != "" {
 		subs = &subtitles.Client{URL: cfg.TranslatorURL, Token: cfg.TranslatorToken}
 	}
+	var sheets *glyphs.Set
+	if cfg.GlyphsDir != "" {
+		if sheets, err = glyphs.Load(cfg.GlyphsDir); err != nil {
+			slog.Warn("handwriting off", "err", err)
+		}
+	}
 	var animator providers.Animator
 	switch cfg.AnimateProvider {
 	case "comfy":
@@ -87,7 +94,7 @@ func run() error {
 		DJfy:     djfy.New(cfg.DJfyURL),
 		Catalog:  cat,
 		Restyler: restyler, Animator: animator, Classifier: classifier,
-		Subtitles: subs,
+		Subtitles: subs, Glyphs: sheets,
 		Web: web.FS(),
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

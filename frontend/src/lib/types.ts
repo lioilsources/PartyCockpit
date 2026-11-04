@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap' | 'stylesweep';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap' | 'stylesweep' | 'game';
 
 export type Party = {
   code: string;
@@ -44,6 +44,7 @@ export type Asset = {
     text?: string;
     nickname?: string;
     color?: string;
+    sheet?: string;
     style?: string;
     styleLabel?: string;
     medium?: string;

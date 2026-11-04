@@ -173,3 +173,37 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
   z náhodného místa přes nově zapnutou scénu.
 - Balíčky neprocházejí taxonomickým filtrem jako slideshow. Na plátno se dostanou
   jen ty, které vybere operátor, a vznikají z vlastních sad uživatele.
+
+## D16: Ručně psané vzkazy z HandWrittenStickers (2026-11-04)
+- Místo HTTP služby PartyCockpit čte sady písmen přímo z `assets/glyphs` aplikace
+  (`PC_GLYPHS_DIR`) a servíruje je na `/glyphs/<id>/…`. Host vybírá z písem kategorií
+  handwriting a kids. Sady s `"bundle": false` (nejasná licence) a materiálová písmena
+  z AI se nenabízejí. Vzkaz si pamatuje sadu v `meta.sheet`.
+- Plátno skládá text v prohlížeči (`lib/handwriting.ts`). Je to port `GlyphRenderer`
+  z appky bez kurzivního spojování: účaří, proporcionální posun, varianty písmen bez
+  opakování, diakritika z písmene a akcentu, záložní sada a deterministické kolísání.
+  Emoji, které sada nemá, se dokreslí jako text. Inkoust se tónuje do barvy textu,
+  barevné sady zůstávají. Bez `PC_GLYPHS_DIR` se píše fontem Caveat jako dřív (D11).
+- Fontové sady jsou OFL. Laurinka je sken skutečné ruky: v repu PartyCockpitu není,
+  čte se jen z disku party boxu.
+
+## D17: Hra o přestávce „Kruh“ (2026-11-04)
+- Kruhový pong pro 2–8 vylosovaných: každý brání svůj oblouk pálkou, kterou táhne
+  prstem na telefonu. Má 3 životy, vyhrává poslední. Míček zrychluje na dobu a od
+  5 hráčů jsou míčky dva. Vlastní návrh, žádná existující hra.
+- Hru počítá plátno. Server jen ví, kdo má který slot (`POST /game` bere poslední
+  losování), a pouští dál vstupy jen z telefonů hráčů (0..1, nejvýš 25×/s).
+  Telefon, který 6 s nic nepošle, převezme pomalý autopilot (🤖), aby jeden vybitý
+  telefon nezastavil hru. PANIC hru ukončí.
+- **Bezpečnost:** ID hosta je jeho tajný klíč (`/guests/{gid}/…`). Show fronta
+  a losování ho dřív posílaly všem s kódem party, takže šlo vystupovat jako jiný host
+  a vidět jeho originály. Teď fronta nese jen jednosměrný tag (`g` + sha256), losování
+  jen přezdívky a „vyhrál jsi“ jde jen na telefon výherce. Telefon se socketu
+  představí přes `?guest=`, server ID ověří.
+
+## D18: Party epizoda webtoonu (2026-11-04)
+- Bez GPU: epizoda „🎉 Party“ ve čtečce webtoonu poskládá panely ze schválených fotek
+  v pořadí show. Bublina panelu je schválený vzkaz téhož hosta (jeho písmem), jinak
+  jen popisek vypravěče. Náměty se nepoužívají, protože se neschvalují.
+- Generovaná epizoda s hosty jako postavami (Ol1nLLM character library) zůstává na
+  později. Potřebuje GPU a vlastní pipeline.

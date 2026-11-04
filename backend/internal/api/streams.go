@@ -280,11 +280,26 @@ func (s *Server) onLeave(code string, peer hub.Peer) {
 // onMsg relays WebRTC signalling. Viewers address a stream, phones answer a
 // viewer peer; nobody else can be reached, and the stage only reaches live streams.
 func (s *Server) onMsg(code string, from hub.Peer, raw []byte) {
+	var head struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(raw, &head) != nil {
+		return
+	}
+	switch head.Type {
+	case "rtc":
+		s.onRTC(code, from, raw)
+	case "game.input":
+		s.onGameInput(code, from, raw)
+	}
+}
+
+func (s *Server) onRTC(code string, from hub.Peer, raw []byte) {
 	var env struct {
 		Type string `json:"type"`
 		Data rtcMsg `json:"data"`
 	}
-	if json.Unmarshal(raw, &env) != nil || env.Type != "rtc" {
+	if json.Unmarshal(raw, &env) != nil {
 		return
 	}
 	m := env.Data

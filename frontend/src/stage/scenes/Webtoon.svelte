@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api } from '../../lib/api';
-  import type { Episode } from '../../lib/types';
+  import type { Asset, Episode } from '../../lib/types';
+  import PartyStrip from './PartyStrip.svelte';
 
   // Pre-made episodes ("divadelní hry", D7), auto-scrolling strip.
-  // params: { episode?: string, speed?: px per second }
-  let { params }: { params: Record<string, any> } = $props();
+  // params: { episode?: string, speed?: px per second }; episode "party" = the
+  // strip of tonight's approved photos and notes (D18).
+  let { params, code, queue, title }: { params: Record<string, any>; code: string; queue: Asset[]; title: string } = $props();
+  const party = params.episode === 'party';
 
   let ep = $state<Episode | null>(null);
   let err = $state('');
@@ -16,6 +19,7 @@
   let pauseUntil = 0;
 
   $effect(() => {
+    if (party) return;
     api
       .get<Episode[]>('/api/webtoon')
       .then((eps) => {
@@ -44,7 +48,10 @@
 </script>
 
 <div class="wt" bind:this={scroller}>
-  {#if ep}
+  {#if party}
+    <PartyStrip {code} {queue} {title} />
+    <div class="end">pokračování příště · fotka, vzkaz a jsi v dalším panelu 📸</div>
+  {:else if ep}
     <h1>{ep.title}</h1>
     {#each ep.panels as p (p)}<img src={p} alt="" />{/each}
     <div class="end">konec · pošli nám námět na další díl 💡</div>
