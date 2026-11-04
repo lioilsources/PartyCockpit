@@ -19,6 +19,8 @@
   import DanceFloor from './scenes/DanceFloor.svelte';
   import Interlude from './scenes/Interlude.svelte';
   import Recap from './scenes/Recap.svelte';
+  import Subtitles from './Subtitles.svelte';
+  import StyleSweep from './scenes/StyleSweep.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
 
@@ -40,6 +42,7 @@
   let music = $state<MusicSnapshot | null>(cached?.music ?? null);
   let online = $state(false);
   let reactions: Reactions;
+  let subtitles: Subtitles;
   let pulse = $state(false);
   let needsAudioClick = $state(false);
   let streams = $state<LiveStream[]>([]);
@@ -81,7 +84,14 @@
           break;
         case 'panic':
           reactions?.clear();
+          subtitles?.clear();
           break;
+        case 'subtitle':
+          subtitles?.add(m.data);
+          return;
+        case 'subtitle.clear':
+          subtitles?.clear();
+          return;
         case 'streams':
           streams = m.data ?? [];
           break;
@@ -120,6 +130,27 @@
     viewer.sync(scene.kind === 'pipwall' ? streams : []);
   });
 
+  // StyleMap sweep as a transition (M7): a scene set with params.transition = pack
+  // id opens with ~2.4 s of style morph over it. Not on page load.
+  let sweepKey = $state('');
+  let sweepPack = $state('');
+  let firstScene = true;
+  $effect(() => {
+    const k = sceneKey;
+    const pack = (scene.params as Record<string, any>)?.transition;
+    if (firstScene) {
+      firstScene = false;
+      return;
+    }
+    if (typeof pack === 'string' && pack) {
+      sweepPack = pack;
+      sweepKey = k;
+      setTimeout(() => {
+        if (sweepKey === k) sweepKey = '';
+      }, 2400);
+    }
+  });
+
   function fullscreen() {
     if (needsAudioClick) {
       clock.enableAudio().then(() => (needsAudioClick = false)).catch(() => {});
@@ -150,6 +181,8 @@
         <Interlude params={scene.params} name={party?.name ?? ''} {clock} />
       {:else if scene.kind === 'recap'}
         <Recap {code} {party} {queue} params={scene.params} {clock} />
+      {:else if scene.kind === 'stylesweep'}
+        <StyleSweep params={scene.params} {clock} />
       {:else if scene.kind === 'pipwall'}
         <PipWall {streams} {viewer} rev={rtcRev} {clock} />
       {:else}
@@ -158,7 +191,16 @@
     </div>
   {/key}
 
+  {#if sweepKey}
+    {#key sweepKey}
+      <div class="scene" out:fade={{ duration: 700 }}>
+        <StyleSweep transition params={{ pack: sweepPack }} {clock} />
+      </div>
+    {/key}
+  {/if}
+
   <Reactions bind:this={reactions} />
+  <Subtitles bind:this={subtitles} />
   {#if scene.kind !== 'nowplaying'}
     <NowPlayingBar {music} />
   {/if}

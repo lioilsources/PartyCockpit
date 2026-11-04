@@ -26,6 +26,7 @@ type env struct {
 	ts    *httptest.Server
 	code  string
 	token string
+	srv   *Server
 }
 
 func newEnv(t *testing.T) *env {
@@ -54,7 +55,7 @@ func newEnv(t *testing.T) *env {
 	}
 	ts := httptest.NewServer(s.Routes())
 	t.Cleanup(ts.Close)
-	e := &env{t: t, ts: ts}
+	e := &env{t: t, ts: ts, srv: s}
 	var p struct {
 		Party struct {
 			Code string `json:"code"`

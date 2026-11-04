@@ -11,6 +11,7 @@ export default defineConfig({
       '/api': backend,
       '/files': backend,
       '/webtoon': backend,
+      '/stylemaps': backend,
       '/ws': { target: backend.replace(/^http/, 'ws'), ws: true },
     },
   },

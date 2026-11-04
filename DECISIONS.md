@@ -150,4 +150,26 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
   https, plátno, ping na Restyler a ComfyUI, poslední restyly, DJfy, tempo, moderace,
   fronta ke schválení, disk, konec party) a ruční checklist v localStorage tabletu.
   Ping na Restyler nesleduje přesměrování: login Cloudflare Access znamená špatný token.
-- Odloženo: titulky z Tlumočníka (další služba) a StyleMap sweep jako přechod.
+- Titulky a StyleMap sweep doplněny 2026-11-04, viz D15.
+
+## D15: M7 titulky a StyleMap sweep (2026-11-04)
+- **Titulky** jdou z mikrofonu moderátora v Cockpitu, ne z telefonů hostů, takže je
+  operátor neschvaluje. PANIC mikrofon vypne a lištu smaže. Operátor může titulek
+  i napsat (oznámení, vzkaz). To funguje i bez Translatoru.
+- Cesta: prohlížeč dělá VAD (energie, 700 ms ticha, nejvýš 12 s) a PCM16 16 kHz
+  posílá na `/ws/parties/<kód>/mic`. Backend to přeposílá na Translator
+  (`TRANSLATOR_URL`, WS protokol v1, režim `streaming`, bez TTS, mluvčí vždy `a`).
+  Token Translatoru tak nikdy nejde do prohlížeče. Na plátno jde průběžný přepis,
+  konečný přepis a překlad (`langA → langB`, nebo bez překladu).
+- Mikrofon v prohlížeči jde jen přes https nebo localhost. Cockpit na tabletu proto
+  potřebuje https stejně jako kamera v telefonu (D12).
+- Translator ani jeho ASR (SPARK, jen přes broker) nikdo z PartyCockpitu nespouští.
+  „Před party“ jen hlídá jeho `/healthz`.
+- **StyleMap sweep**: balíčky z FineTuneGallery `/stylemaps/` (staví je Ol1nLLM
+  `tools/stylemap`) jdou přes náš proxy s diskovou cache. Manifesty se obnovují po
+  10 min, obrázky po dni, a při výpadku se servíruje starší kopie. Přehrává se
+  pořadí `tour` (nejmenší kroky LPIPS), jinak Hilbertova křivka. Jako scéna
+  `stylesweep` běží ve smyčce, jako přechod (`params.transition`) hraje 2,4 s
+  z náhodného místa přes nově zapnutou scénu.
+- Balíčky neprocházejí taxonomickým filtrem jako slideshow. Na plátno se dostanou
+  jen ty, které vybere operátor, a vznikají z vlastních sad uživatele.

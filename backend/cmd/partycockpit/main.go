@@ -19,6 +19,7 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
+	"github.com/lioilsources/PartyCockpit/backend/internal/subtitles"
 	"github.com/lioilsources/PartyCockpit/backend/internal/web"
 )
 
@@ -60,6 +61,10 @@ func run() error {
 	default:
 		restyler = &providers.Mock{Delay: 3 * time.Second}
 	}
+	var subs *subtitles.Client
+	if cfg.TranslatorURL != "" {
+		subs = &subtitles.Client{URL: cfg.TranslatorURL, Token: cfg.TranslatorToken}
+	}
 	var animator providers.Animator
 	switch cfg.AnimateProvider {
 	case "comfy":
@@ -82,6 +87,7 @@ func run() error {
 		DJfy:     djfy.New(cfg.DJfyURL),
 		Catalog:  cat,
 		Restyler: restyler, Animator: animator, Classifier: classifier,
+		Subtitles: subs,
 		Web: web.FS(),
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

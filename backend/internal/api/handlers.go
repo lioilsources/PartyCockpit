@@ -379,7 +379,7 @@ func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitStat
 	st.Clients = s.Hub.Counts(p.Code)
 	st.Config = map[string]any{
 		"restyle": s.Restyler.Name(), "animate": s.Animator.Name(), "moderation": s.Cfg.Moderation,
-		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL,
+		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL, "subtitles": s.Subtitles != nil,
 	}
 	return st, nil
 }
@@ -417,7 +417,7 @@ func (s *Server) listIdeas(w http.ResponseWriter, r *http.Request, p store.Party
 var sceneKinds = map[string]bool{
 	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
 	"webtoon": true, "lottery": true, "blank": true, "pipwall": true, "dance": true,
-	"interlude": true, "recap": true, // M7
+	"interlude": true, "recap": true, "stylesweep": true, // M7
 }
 
 func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party) {
@@ -444,6 +444,7 @@ func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
 		return
 	}
 	s.unliveAll(p.Code)
+	s.stopMic(p.Code)
 	s.Hub.Broadcast(p.Code, hub.Msg{Type: "panic", Data: nil})
 	s.broadcastParty(r, p.Code)
 	w.WriteHeader(204)

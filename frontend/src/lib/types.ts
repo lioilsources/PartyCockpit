@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap' | 'stylesweep';
 
 export type Party = {
   code: string;
@@ -88,7 +88,7 @@ export type CockpitState = {
   ideas: Idea[];
   jobs: { intent: string; status: string; count: number; avgMs: number }[];
   clients: Record<string, number>;
-  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string };
+  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string; subtitles: boolean };
 };
 
 export const fileUrl = (code: string, file?: string) => (file ? `/files/${code}/${file}` : '');
@@ -110,6 +110,9 @@ export type RecapItem = {
   color?: string;
 };
 export type Recap = { name: string; code: string; endsAt: number; purgeAt: number; url: string; items: RecapItem[] };
+
+/** A subtitle update (backend subtitles.Line); one id is updated several times. */
+export type SubtitleLine = { id: number; text: string; lang?: string; translation?: string; toLang?: string; final: boolean; done: boolean };
 
 /** Cockpit preflight (M7): live checks of the evening runbook. */
 export type Check = { id: string; label: string; status: 'ok' | 'warn' | 'fail' | 'info'; detail: string };

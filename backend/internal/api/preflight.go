@@ -107,6 +107,20 @@ func (s *Server) preflight(w http.ResponseWriter, r *http.Request, p store.Party
 		}
 	}
 
+	// subtitles
+	if s.Subtitles == nil {
+		add("subtitles", "Titulky", "info", "bez Translatoru: jen ručně psané titulky z Cockpitu (TRANSLATOR_URL)")
+	} else {
+		pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err := s.Subtitles.Health(pctx)
+		cancel()
+		if err != nil {
+			add("subtitles", "Titulky", "warn", "Translator neodpovídá: "+err.Error())
+		} else {
+			add("subtitles", "Titulky", "ok", "Translator odpovídá")
+		}
+	}
+
 	// music and beat
 	switch {
 	case p.DJfyCode == "":

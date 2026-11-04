@@ -169,7 +169,12 @@ func (c *Client) ServeFile(w http.ResponseWriter, r *http.Request, kind, sha str
 }
 
 func (c *Client) download(ctx context.Context, kind, sha, path string) error {
-	resp, err := c.get(ctx, c.Base+"/"+kind+"/"+sha)
+	return c.downloadURL(ctx, c.Base+"/"+kind+"/"+sha, path)
+}
+
+// downloadURL writes url to path atomically (temp file + rename).
+func (c *Client) downloadURL(ctx context.Context, url, path string) error {
+	resp, err := c.get(ctx, url)
 	if err != nil {
 		return err
 	}

@@ -4,8 +4,10 @@
   import { connect, type Socket } from '../lib/ws';
   import { TapTempo } from '../lib/beat';
   import { Viewer, srcObject, type RtcMsg } from '../lib/rtc';
-  import { fileUrl, plural, recapUrl, type Asset, type Check, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type Tempo } from '../lib/types';
+  import { fileUrl, plural, recapUrl, type Asset, type Check, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type SubtitleLine, type Tempo } from '../lib/types';
   import Clip from '../lib/Clip.svelte';
+  import { Mic } from '../lib/mic';
+  import { listPacks, type PackInfo } from '../lib/stylemap';
 
   let { code }: { code: string } = $props();
 
@@ -47,6 +49,8 @@
         else if (m.type === 'streams') streams = m.data ?? [];
         else if (m.type === 'rtc') viewer?.handle(m.data as RtcMsg);
         else if (m.type === 'hello') viewer?.reset();
+        else if (m.type === 'subtitle') subLine(m.data as SubtitleLine);
+        else if (m.type === 'subtitle.clear') subs = [];
       },
       (o) => (online = o),
       { token },
@@ -71,7 +75,49 @@
   onDestroy(() => {
     viewer?.destroy();
     sock?.close();
+    mic.stop();
   });
+
+  // ── subtitles (M7): MC microphone → Translator → caption bar on the stage
+  let subs = $state<SubtitleLine[]>([]);
+  let micRev = $state(0);
+  const mic = new Mic(() => micRev++);
+  const micState = $derived((void micRev, mic.state));
+  const micLevel = $derived((void micRev, mic.level));
+  const micError = $derived((void micRev, mic.error));
+  let langA = $state(store.get('pc.sub.langA') ?? 'cs');
+  let langB = $state(store.get('pc.sub.langB') ?? 'en');
+  let typed = $state('');
+  const langs = [
+    ['cs', 'čeština'],
+    ['sk', 'slovenčina'],
+    ['en', 'angličtina'],
+    ['de', 'němčina'],
+    ['uk', 'ukrajinština'],
+    ['pl', 'polština'],
+    ['es', 'španělština'],
+  ];
+  function subLine(l: SubtitleLine) {
+    const i = subs.findIndex((x) => x.id === l.id);
+    if (i >= 0) subs[i] = l;
+    else subs = [l, ...subs].slice(0, 6);
+  }
+  function toggleMic() {
+    if (micState === 'off' || micState === 'error') {
+      store.set('pc.sub.langA', langA);
+      store.set('pc.sub.langB', langB);
+      mic.start(code, token, langA, langB);
+    } else mic.stop();
+  }
+  function sendTyped(e: Event) {
+    e.preventDefault();
+    const text = typed.trim();
+    if (!text) return;
+    act(async () => {
+      await api.post(p('/subtitle'), { text }, token);
+      typed = '';
+    });
+  }
 
   // ── live streams: the cockpit previews every phone, pending ones included,
   // so the operator sees who they let on the wall
@@ -111,10 +157,24 @@
     { kind: 'pipwall', label: '📡 Živě (streamy)' },
     { kind: 'dance', label: '💃 Tančírna' },
     { kind: 'interlude', label: '🌀 Shader přestávka' },
+    { kind: 'stylesweep', label: '🎨 StyleMap' },
     { kind: 'recap', label: '🎞 Recap (konec)' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
   let shader = $state('');
+  let packs = $state<PackInfo[]>([]);
+  let pack = $state(store.get('pc.stylemap') ?? '');
+  let sweepTransition = $state(store.get('pc.stylemap.transition') === '1');
+  listPacks()
+    .then((ps) => {
+      packs = ps;
+      if (!ps.some((x) => x.id === pack)) pack = ps[0]?.id ?? '';
+    })
+    .catch(() => {});
+  $effect(() => {
+    store.set('pc.stylemap', pack);
+    store.set('pc.stylemap.transition', sweepTransition ? '1' : '0');
+  });
   let slideStyle = $state('');
   let beats = $state(8);
   let episodes = $state<Episode[]>([]);
@@ -125,6 +185,8 @@
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
     if (kind === 'webtoon' && episode) params.episode = episode;
+    if (kind === 'stylesweep' && pack) params.pack = pack;
+    else if (sweepTransition && pack) params.transition = pack;
     if (kind === 'interlude') {
       params.beats = Math.max(beats, 16);
       if (shader) params.shader = shader;
@@ -263,6 +325,14 @@
             <option value="aurora">Polární záře</option>
           </select>
         </label>
+        {#if packs.length}
+          <label>StyleMap
+            <select bind:value={pack}>
+              {#each packs as x (x.id)}<option value={x.id}>{x.title} ({x.n})</option>{/each}
+            </select>
+          </label>
+          <label><input type="checkbox" bind:checked={sweepTransition} /> přechod přes StyleMap</label>
+        {/if}
         <a href={recapUrl(party.joinUrl)} target="_blank">recap pro hosty ↗</a>
         {#if episodes.length}
           <label>epizoda
@@ -447,6 +517,52 @@
       </section>
 
       <section>
+        <h2>
+          🎤 Titulky na plátno
+          {#if subs.length}<button onclick={() => act(() => api.del(p('/subtitle'), token))}>smazat</button>{/if}
+        </h2>
+        {#if st?.config.subtitles}
+          <div class="row small">
+            <label>mluvím
+              <select bind:value={langA} disabled={micState !== 'off' && micState !== 'error'}>
+                {#each langs as [id, label] (id)}<option value={id}>{label}</option>{/each}
+              </select>
+            </label>
+            <label>překlad do
+              <select bind:value={langB} disabled={micState !== 'off' && micState !== 'error'}>
+                <option value={langA}>(bez překladu)</option>
+                {#each langs.filter(([id]) => id !== langA) as [id, label] (id)}<option value={id}>{label}</option>{/each}
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <button class:primary={micState === 'off' || micState === 'error'} class:bad={micState !== 'off' && micState !== 'error'} onclick={toggleMic} disabled={!window.isSecureContext}>
+              {micState === 'off' || micState === 'error' ? '🎤 Zapnout mikrofon' : '⏹ Vypnout'}
+            </button>
+            {#if micState !== 'off' && micState !== 'error'}
+              <span class="meter"><span style:width={`${Math.round(micLevel * 100)}%`} class:on={micState === 'speaking'}></span></span>
+              <span class="muted">{micState === 'starting' ? 'připojuji…' : micState === 'speaking' ? 'mluvíš' : 'poslouchám'}</span>
+            {/if}
+          </div>
+          {#if !window.isSecureContext}<p class="muted small">Mikrofon v prohlížeči jde jen přes https (nebo localhost).</p>{/if}
+          {#if micState === 'error'}<p class="err">{micError}</p>{/if}
+        {:else}
+          <p class="muted small">Mikrofon potřebuje Translator (TRANSLATOR_URL). Psát titulky jde i bez něj.</p>
+        {/if}
+        <form class="row" onsubmit={sendTyped}>
+          <input placeholder="napsat na plátno (vzkaz, oznámení)" maxlength="160" bind:value={typed} />
+          <button disabled={!typed.trim()}>Na plátno</button>
+        </form>
+        {#if subs.length}
+          <ul class="subs">
+            {#each subs as l (l.id)}
+              <li class:partial={!l.final}>{l.text}{#if l.translation && l.translation !== l.text}<br /><span>{l.translation}</span>{/if}</li>
+            {/each}
+          </ul>
+        {/if}
+      </section>
+
+      <section>
         <h2>Losování hráčů</h2>
         <p class="muted">chtějí hrát: {players.length ? players.map((g) => g.nickname).join(', ') : 'nikdo (losuje se ze všech)'}</p>
         <form class="row" onsubmit={(e) => { e.preventDefault(); act(() => api.post(p('/lottery'), { count: lotCount, game: lotGame }, token)); }}>
@@ -574,10 +690,6 @@
     align-items: baseline;
     cursor: pointer;
   }
-  .pf input[type='checkbox'] {
-    width: auto;
-    flex: none;
-  }
   .pf {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -634,7 +746,7 @@
     gap: 6px;
     align-items: center;
   }
-  .row label input {
+  .row label input:not([type='checkbox']) {
     width: 7em;
   }
   .cards {
@@ -721,6 +833,36 @@
   }
   .react {
     font-size: 1.4rem;
+  }
+  .meter {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--line);
+    overflow: hidden;
+  }
+  .meter span {
+    display: block;
+    height: 100%;
+    background: var(--muted);
+    transition: width 0.1s;
+  }
+  .meter span.on {
+    background: var(--green);
+  }
+  .subs {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+    display: grid;
+    gap: 4px;
+    font-size: 14px;
+  }
+  .subs li.partial {
+    color: var(--muted);
+  }
+  .subs span {
+    color: var(--yellow);
   }
   .ideas {
     padding-left: 18px;

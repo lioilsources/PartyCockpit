@@ -86,6 +86,12 @@ textarea {
   padding: 0.6em 0.75em;
   width: 100%;
 }
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  padding: 0;
+  flex: none;
+}
 input:focus,
 textarea:focus,
 select:focus {

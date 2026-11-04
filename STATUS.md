@@ -69,10 +69,13 @@ takže to chce okno. Nový prompt pro robota také zatím neběžel.
 | scéna Shader přestávka, 5 shaderů, střídání po N dobách | ✅ |
 | Cockpit „Před party“: živé kontroly + ruční checklist | ✅ |
 | show fronta bez `meta.original` | ✅ |
-| titulky (Tlumočník), StyleMap sweep | ⏳ odloženo |
+| titulky: mikrofon v Cockpitu → Translator → lišta na plátně, ruční titulky | ✅ testy proti fake Translatoru |
+| StyleMap sweep: scéna a přechod mezi scénami, proxy + cache balíčků | ✅ na lokálním demo balíčku |
 
-Ověřeno: Go testy (recap, zip, preflight, ping) a v Chrome na mocku všechny tři
-scény a obě stránky. Na skutečné TV a mini PC výkon shaderů neověřen.
+Ověřeno: Go testy (recap, zip, preflight, ping, titulky přes fake Translator) a v Chrome
+na mocku všechny scény, ruční titulky, StyleMap scéna i přechod (lokální demo balíček).
+**Neověřeno:** mikrofon v prohlížeči se skutečným Translatorem, reálné balíčky
+z FineTuneGallery (za CF Access), výkon shaderů na TV a mini PC.
 
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
@@ -83,4 +86,4 @@ scény a obě stránky. Na skutečné TV a mini PC výkon shaderů neověřen.
    vah LivePortrait pro B2B.
 5. HandWrittenStickers jako HTTP služba (glyph extraktor).
 6. Hry o přestávce (Three.js, co-op), napojené na výsledek losování.
-7. M7 zbytek: titulky z Tlumočníka, StyleMap sweep jako přechod. M5 3D tanečníci.
+7. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.

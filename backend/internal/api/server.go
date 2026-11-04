@@ -23,6 +23,7 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
+	"github.com/lioilsources/PartyCockpit/backend/internal/subtitles"
 )
 
 type Server struct {
@@ -34,6 +35,7 @@ type Server struct {
 	Catalog    *providers.Catalog
 	Restyler   providers.Restyler
 	Animator   providers.Animator
+	Subtitles  *subtitles.Client // nil = typed subtitles only
 	Classifier providers.Classifier
 	Web        fs.FS // built frontend (may be empty in dev)
 
@@ -47,6 +49,9 @@ type Server struct {
 
 	smu     sync.Mutex
 	streams map[string]map[string]*Stream // party → stream id → live phone camera
+
+	mmu  sync.Mutex
+	mics map[string]*mic // party → the MC microphone feeding subtitles
 }
 
 // Tempo drives every scene's tick(beat). Source: tap | djfy | none; the stage
@@ -60,6 +65,7 @@ type Tempo struct {
 func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
 	s.streams = map[string]map[string]*Stream{}
+	s.mics = map[string]*mic{}
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
@@ -133,6 +139,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/parties/{code}/ideas", s.cockpit(s.listIdeas))
 	mux.HandleFunc("GET /api/parties/{code}/streams", s.cockpit(s.listStreams))
 	mux.HandleFunc("GET /api/parties/{code}/preflight", s.cockpit(s.preflight))
+	mux.HandleFunc("POST /api/parties/{code}/subtitle", s.cockpit(s.typedSubtitle))
+	mux.HandleFunc("DELETE /api/parties/{code}/subtitle", s.cockpit(s.clearSubtitles))
+	mux.HandleFunc("GET /ws/parties/{code}/mic", s.cockpit(s.micSocket))
 	mux.HandleFunc("POST /api/parties/{code}/animate", s.cockpit(s.animateGallery))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))
@@ -145,6 +154,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/gallery/{kind}/{sha}", func(w http.ResponseWriter, r *http.Request) {
 		s.Gallery.ServeFile(w, r, r.PathValue("kind"), r.PathValue("sha"))
 	})
+	mux.HandleFunc("GET /stylemaps/{rel...}", func(w http.ResponseWriter, r *http.Request) { s.Gallery.ServeStyleMap(w, r, r.PathValue("rel")) })
 	mux.HandleFunc("GET /api/webtoon", s.listWebtoon)
 	mux.HandleFunc("GET /webtoon/{ep}/{file}", s.serveWebtoon)
 

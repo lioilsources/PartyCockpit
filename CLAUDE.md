@@ -8,7 +8,7 @@ Party show na plátno: Stage (TV), Cockpit (operátor), Guest (telefon přes QR)
 ```sh
 make build      # npm build → embed do backend/internal/web/dist → bin/partycockpit
 make run        # s .env
-make dev        # backend :8098 + vite :5173 (proxy /api /ws /files /webtoon)
+make dev        # backend :8098 + vite :5173 (proxy /api /ws /files /webtoon /stylemaps)
 make check      # go vet + go test + svelte-check + vite build — brána před pushem
 make styles     # přegeneruje katalog stylů z ../Restyler
 ```
@@ -24,6 +24,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
   `restyle_styles.json` je generovaný z Restyleru
 - `backend/internal/api/streams.go` — živé streamy: registry + WebRTC signalizace (P2P, LAN)
 - `backend/internal/api/recap.go`, `preflight.go` — M7: recap + zip, kontroly „Před party“
+- `backend/internal/subtitles` + `api/subtitles.go` — titulky přes Translator; `frontend/src/lib/mic.ts` VAD
 - `backend/internal/djfy` — klient DJfy relay (SSE + guest zprávy)
 - `backend/internal/gallery` — FineTuneGallery list + disková cache obrázků
 - `frontend/src/stage` — scény (`scenes/*.svelte`), overlaye, PixiJS reakce
@@ -49,4 +50,4 @@ SQLite místo Postgres (přenosný party box), port 8098, restyle přes Restyler
 stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit, animace přímo přes ComfyUI. Detail v `DECISIONS.md` D2, D11–D13.
 
 ## Kam dál
-`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, M5 3D, M7 titulky, HandWrittenStickers.
+`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, M5 3D, M7 naostro, HandWrittenStickers.
