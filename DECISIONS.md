@@ -121,5 +121,15 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
 - **Soukromí:** fotky hostů jdou na L40S (T-Mobile sandbox, není náš stroj). ComfyUI
   tam poslouchá jen na 127.0.0.1 a je dostupné přes VPN a SSH tunel. Party box mimo
   domov potřebuje OpenVPN profil a tunel.
-- **Cropper** pro LivePortrait je MediaPipe (Apache 2.0). InsightFace je nekomerční
-  a PartyCockpit může být B2B (D10).
+- **Cropper** pro LivePortrait je FaceAlignment + BlazeFace (`LivePortraitLoadFaceAlignmentCropper`).
+  InsightFace je nekomerční a PartyCockpit může být B2B (D10). MediaPipe cropper na L40S
+  nejde: node chce staré `mediapipe.framework` API a downgrade by rozbil sdílený venv.
+  Licence: face_alignment BSD-3, váhy BlazeFace Apache-2.0. **Otevřené:** licence vah
+  LivePortrait (KwaiVGI) včetně `landmark.onnx` pro B2B zatím nikdo neprověřil.
+- Ověřeno na L40S 2026-11-03: tanec 480×832×81 (5 s, 16 fps) za 46 s na volné GPU, ~40 GB
+  VRAM; živý portrét 10 s (252 snímků, 25 fps) za 29 s (první běh 104 s), ~2 GB VRAM.
+  Kvalita: disco a skákání dobré, hip-hop hlavně ruce, robot slabý (prompt zpřesněn, znovu
+  neověřeno). Wan workflow ukládá přes VHS_VideoCombine (mp4 h264).
+- ComfyUI na L40S běží jen v profilu D a GPU je sdílená (AlphaZero, Webtoon). Na party je
+  potřeba domluvit okno v L40S session. Patch v `ComfyUI-LivePortraitKJ`
+  (`face_alignment/api.py`, relativní import) se při `git pull` nodu ztratí.

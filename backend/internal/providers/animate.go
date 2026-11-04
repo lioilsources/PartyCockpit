@@ -51,16 +51,16 @@ const danceNegative = "blurry, distorted face, deformed hands, extra limbs, extr
 // Motions is the catalogue. "alive" drives the gallery; the rest are dances a guest picks.
 var Motions = []Motion{
 	{ID: "alive", Label: "Živý portrét", Engine: "live", Seconds: 10},
-	{ID: "disco", Label: "🪩 Disco", Engine: "dance", Seconds: 3.4,
+	{ID: "disco", Label: "🪩 Disco", Engine: "dance", Seconds: 5,
 		Prompt: "the person dances energetically to disco music, pointing one arm up and down, hips swaying, smiling, " +
 			"full body visible, static camera, same face and outfit, party lights"},
-	{ID: "hiphop", Label: "🧢 Hip-hop", Engine: "dance", Seconds: 3.4,
+	{ID: "hiphop", Label: "🧢 Hip-hop", Engine: "dance", Seconds: 5,
 		Prompt: "the person does a hip-hop dance, bouncing knees, rolling shoulders and waving arms to the beat, " +
 			"full body visible, static camera, same face and outfit"},
-	{ID: "robot", Label: "🤖 Robot", Engine: "dance", Seconds: 3.4,
-		Prompt: "the person does the robot dance with stiff mechanical arm and head moves, " +
-			"full body visible, static camera, same face and outfit"},
-	{ID: "jump", Label: "🙌 Skákání", Engine: "dance", Seconds: 3.4,
+	{ID: "robot", Label: "🤖 Robot", Engine: "dance", Seconds: 5,
+		Prompt: "the person does the robot dance: elbows bent at 90 degrees, forearms moving in sharp stop-motion steps, " +
+			"head turning in jerky ticks, stiff torso, full body visible, static camera, same face and outfit"},
+	{ID: "jump", Label: "🙌 Skákání", Engine: "dance", Seconds: 5,
 		Prompt: "the person jumps up and down to the music with both arms raised, celebrating, " +
 			"full body visible, static camera, same face and outfit"},
 }

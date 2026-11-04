@@ -2,7 +2,7 @@
   "1": {
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Photo (template from MangaPrompts feat/restyler, UNVERIFIED until validated on the GPU host)"
+      "title": "Photo (validated on L40S 2026-11-03: 832x1216 selfie + 10 s driver = 29 s warm)"
     },
     "inputs": {
       "image": "__IMAGE__",
@@ -20,14 +20,16 @@
     }
   },
   "3": {
-    "class_type": "LivePortraitLoadCropper",
+    "class_type": "LivePortraitLoadFaceAlignmentCropper",
     "_meta": {
-      "title": "InsightFace cropper"
+      "title": "FaceAlignment + BlazeFace cropper (InsightFace is non-commercial; the MediaPipe cropper needs mediapipe<0.11)"
     },
     "inputs": {
-      "onnx_device": "CPU",
-      "keep_model_loaded": true,
-      "detection_threshold": 0.5
+      "face_detector": "blazeface",
+      "landmarkrunner_device": "CPU",
+      "face_detector_device": "cuda",
+      "face_detector_dtype": "fp16",
+      "keep_model_loaded": true
     }
   },
   "4": {

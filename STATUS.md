@@ -47,23 +47,25 @@ Pozn.: na tomhle Macu drží port 8098 zapomenutý `python -m http.server 8098` 
 | Část | Stav |
 |---|---|
 | provider `Comfy` (upload, /prompt, /history, /view, driver), `RestylerAnimator`, `MockAnimator` | ✅ testy proti fake ComfyUI |
-| workflow `live_portrait.json`, `wan_i2v.json` | ⏳ šablony, ověřuje a upravuje L40S session |
-| driver `alive` | ⏳ L40S session (syntetický) → `assets/drivers/alive.mp4` |
+| workflow `live_portrait.json` (BlazeFace cropper), `wan_i2v.json` (14B + lightx2v) | ✅ ověřeno v L40S session |
+| driver `alive` (syntetický, 10 s, pingpong) | ✅ `assets/drivers/alive.mp4`, na VM `input/pc_driver_alive.mp4` |
 | auto-oživení schválených fotek, „✨ Oživit galerii“, galerie hraje smyčky | ✅ |
 | „Roztanči mě“ v telefonu, schválení, scéna Tančírna (tempo ±10 %) | ✅ |
 
 Ověřeno: Go testy (celý tok na mocku, Comfy proti fake serveru, store) a v Chrome
 na mocku Tančírna se 3 tanečníky, galerie s živým portrétem a „Roztanči mě“.
 Opravena chyba: auto-oživení blokovalo hostovi nahrání fotky.
-**Neověřeno:** reálný ComfyUI na L40S. Inventura: Wan 2.2 I2V 14B + lightx2v je
-k dispozici (~47 s na klip 832×480×81), LivePortraitKJ chybí. Instalace čeká na
-souhlas uživatele v L40S session.
+L40S session workflow ověřila přímo v ComfyUI: tanec 46 s, živý portrét 29 s (časy a
+kvalita v DECISIONS D13). **Neověřeno:** PartyCockpit `ANIMATE_PROVIDER=comfy` proti
+skutečnému ComfyUI. ComfyUI se po testech L40S vypnulo (GPU zpátky pro AlphaZero),
+takže to chce okno. Nový prompt pro robota také zatím neběžel.
 
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
 3. M3 dokončit: MirrorBooth podle `docs/mirrorbooth-stream.md`, test na LAN s telefony.
-4. M4 dokončit: v L40S session schválit instalaci LivePortraitKJ a pauzu AZ, pak
-   ověřit `ANIMATE_PROVIDER=comfy` s workflow a driverem od L40S.
+4. M4 dokončit: domluvit v L40S session okno s ComfyUI (profil D) a ověřit
+   `ANIMATE_PROVIDER=comfy` celou cestou (telefon → Cockpit → plátno). Prověřit licenci
+   vah LivePortrait pro B2B.
 5. HandWrittenStickers jako HTTP služba (glyph extraktor).
 6. Hry o přestávce (Three.js, co-op), napojené na výsledek losování.
