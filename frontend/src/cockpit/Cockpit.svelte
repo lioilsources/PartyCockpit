@@ -4,7 +4,7 @@
   import { connect, type Socket } from '../lib/ws';
   import { TapTempo } from '../lib/beat';
   import { Viewer, srcObject, type RtcMsg } from '../lib/rtc';
-  import { fileUrl, type Asset, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type Tempo } from '../lib/types';
+  import { fileUrl, plural, recapUrl, type Asset, type Check, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type Tempo } from '../lib/types';
   import Clip from '../lib/Clip.svelte';
 
   let { code }: { code: string } = $props();
@@ -110,8 +110,11 @@
     { kind: 'lottery', label: '🎲 Losování' },
     { kind: 'pipwall', label: '📡 Živě (streamy)' },
     { kind: 'dance', label: '💃 Tančírna' },
+    { kind: 'interlude', label: '🌀 Shader přestávka' },
+    { kind: 'recap', label: '🎞 Recap (konec)' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
+  let shader = $state('');
   let slideStyle = $state('');
   let beats = $state(8);
   let episodes = $state<Episode[]>([]);
@@ -122,8 +125,42 @@
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
     if (kind === 'webtoon' && episode) params.episode = episode;
+    if (kind === 'interlude') {
+      params.beats = Math.max(beats, 16);
+      if (shader) params.shader = shader;
+    }
     act(() => api.post(p('/scene'), { kind, params }, token));
   }
+
+  // ── preflight (M7): live checks from the server + the manual runbook
+  let checks = $state<Check[]>([]);
+  let checking = $state(false);
+  async function preflight() {
+    checking = true;
+    try {
+      checks = (await api.get<{ checks: Check[] }>(p('/preflight'), token)).checks;
+    } catch (e: any) {
+      err = e.message;
+    } finally {
+      checking = false;
+    }
+  }
+  const manual = [
+    { id: 'audio', label: 'Zvuk do plátna: loopback (BlackHole / VB-Cable) nebo mikrofon, plátno s ?audio=1' },
+    { id: 'kiosk', label: 'Plátno v kiosku na celou obrazovku, spořič a uspávání vypnuté' },
+    { id: 'qr', label: 'QR na plátně vyzkoušené vlastním telefonem přes Wi-Fi hostů' },
+    { id: 'tablet', label: 'Cockpit na tabletu, nabitý, PANIC vyzkoušený' },
+    { id: 'gpu', label: 'GPU okno domluvené (L40S ComfyUI na animace, Restyler na fotky)' },
+    { id: 'djfy', label: 'DJfy hraje z hostitelského telefonu, kód zadaný v Cockpitu' },
+  ];
+  const runKey = `pc.runbook.${code}`;
+  let done = $state<Record<string, boolean>>(JSON.parse(store.get(runKey) ?? '{}'));
+  function toggle(id: string) {
+    done = { ...done, [id]: !done[id] };
+    store.set(runKey, JSON.stringify(done));
+  }
+  const problems = $derived(checks.filter((c) => c.status === 'fail').length);
+  const warnings = $derived(checks.filter((c) => c.status === 'warn').length);
 
   // ── moderation
   const pending = $derived((st?.assets ?? []).filter((a) => a.status === 'pending'));
@@ -216,6 +253,17 @@
       <div class="row small">
         <label>přepnout každých <input type="number" min="2" max="64" bind:value={beats} /> dob</label>
         <label>styl slideshow <input placeholder="(všechny) styleId" bind:value={slideStyle} /></label>
+        <label>shader
+          <select bind:value={shader}>
+            <option value="">(střídat)</option>
+            <option value="plasma">Plazma</option>
+            <option value="tunnel">Tunel</option>
+            <option value="kaleido">Kaleidoskop</option>
+            <option value="bars">Ekvalizér</option>
+            <option value="aurora">Polární záře</option>
+          </select>
+        </label>
+        <a href={recapUrl(party.joinUrl)} target="_blank">recap pro hosty ↗</a>
         {#if episodes.length}
           <label>epizoda
             <select bind:value={episode}>
@@ -225,6 +273,35 @@
         {/if}
       </div>
     </section>
+
+    <details class="preflight" ontoggle={(e) => (e.currentTarget as HTMLDetailsElement).open && !checks.length && preflight()}>
+      <summary>
+        ✅ Před party
+        {#if checks.length}
+          <span class:bad={problems > 0} class:warn={!problems && warnings > 0}>
+            {problems ? `${problems} ${plural(problems, 'problém', 'problémy', 'problémů')}` : warnings ? `${warnings} ${plural(warnings, 'upozornění', 'upozornění', 'upozornění')}` : 'v pořádku'}
+          </span>
+        {/if}
+      </summary>
+      <div class="pf">
+        <div>
+          <h3>Automatické kontroly <button onclick={preflight} disabled={checking}>{checking ? '…' : '↻'}</button></h3>
+          <ul>
+            {#each checks as c (c.id)}
+              <li class={c.status}><b>{c.label}</b> {c.detail}</li>
+            {/each}
+          </ul>
+        </div>
+        <div>
+          <h3>Ručně</h3>
+          <ul>
+            {#each manual as m (m.id)}
+              <li><label><input type="checkbox" checked={!!done[m.id]} onchange={() => toggle(m.id)} /> {m.label}</label></li>
+            {/each}
+          </ul>
+        </div>
+      </div>
+    </details>
 
     <div class="grid">
       <section>
@@ -468,6 +545,74 @@
   }
   h2 strong {
     color: var(--yellow);
+  }
+  .preflight {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+  .preflight summary {
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .preflight summary span {
+    margin-left: 8px;
+    font-weight: 400;
+    color: var(--green);
+  }
+  .preflight summary span.bad {
+    color: var(--red);
+  }
+  .preflight summary span.warn {
+    color: var(--yellow);
+  }
+  .pf label {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    cursor: pointer;
+  }
+  .pf input[type='checkbox'] {
+    width: auto;
+    flex: none;
+  }
+  .pf {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .pf h3 {
+    font-size: 15px;
+    margin: 12px 0 6px;
+  }
+  .pf ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+  }
+  .pf li {
+    border-left: 4px solid var(--line);
+    padding: 2px 8px;
+  }
+  .pf li.ok {
+    border-color: var(--green);
+  }
+  .pf li.warn {
+    border-color: var(--yellow);
+  }
+  .pf li.fail {
+    border-color: var(--red);
+  }
+  .pf li.info {
+    border-color: var(--cyan);
+  }
+  .pf b {
+    margin-right: 4px;
   }
   .grid {
     display: grid;

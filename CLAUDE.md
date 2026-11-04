@@ -23,6 +23,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `backend/internal/providers` — Restyler backend, AiStack kontext, mock, WD14 klasifikátor;
   `restyle_styles.json` je generovaný z Restyleru
 - `backend/internal/api/streams.go` — živé streamy: registry + WebRTC signalizace (P2P, LAN)
+- `backend/internal/api/recap.go`, `preflight.go` — M7: recap + zip, kontroly „Před party“
 - `backend/internal/djfy` — klient DJfy relay (SSE + guest zprávy)
 - `backend/internal/gallery` — FineTuneGallery list + disková cache obrázků
 - `frontend/src/stage` — scény (`scenes/*.svelte`), overlaye, PixiJS reakce
@@ -48,4 +49,4 @@ SQLite místo Postgres (přenosný party box), port 8098, restyle přes Restyler
 stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit, animace přímo přes ComfyUI. Detail v `DECISIONS.md` D2, D11–D13.
 
 ## Kam dál
-`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, tanec, 3D hry, HandWrittenStickers.
+`STATUS.md`: M3 MirrorBooth stream, M4 ověření na L40S, M5 3D, M7 titulky, HandWrittenStickers.

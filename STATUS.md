@@ -60,6 +60,20 @@ kvalita v DECISIONS D13). **Neověřeno:** PartyCockpit `ANIMATE_PROVIDER=comfy`
 skutečnému ComfyUI. ComfyUI se po testech L40S vypnulo (GPU zpátky pro AlphaZero),
 takže to chce okno. Nový prompt pro robota také zatím neběžel.
 
+## 2026-11-04: M7 vyladění show (část)
+
+| Část | Stav |
+|---|---|
+| scéna Recap (mozaika, reflektor po dobách, QR na stažení) | ✅ |
+| `/recap/<kód>` pro hosty: mřížka, detail, stažení po jednom i zip | ✅ |
+| scéna Shader přestávka, 5 shaderů, střídání po N dobách | ✅ |
+| Cockpit „Před party“: živé kontroly + ruční checklist | ✅ |
+| show fronta bez `meta.original` | ✅ |
+| titulky (Tlumočník), StyleMap sweep | ⏳ odloženo |
+
+Ověřeno: Go testy (recap, zip, preflight, ping) a v Chrome na mocku všechny tři
+scény a obě stránky. Na skutečné TV a mini PC výkon shaderů neověřen.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
@@ -69,3 +83,4 @@ takže to chce okno. Nový prompt pro robota také zatím neběžel.
    vah LivePortrait pro B2B.
 5. HandWrittenStickers jako HTTP služba (glyph extraktor).
 6. Hry o přestávce (Three.js, co-op), napojené na výsledek losování.
+7. M7 zbytek: titulky z Tlumočníka, StyleMap sweep jako přechod. M5 3D tanečníci.

@@ -17,6 +17,8 @@
   import Blank from './scenes/Blank.svelte';
   import PipWall from './scenes/PipWall.svelte';
   import DanceFloor from './scenes/DanceFloor.svelte';
+  import Interlude from './scenes/Interlude.svelte';
+  import Recap from './scenes/Recap.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
 
@@ -144,6 +146,10 @@
         <Lottery params={scene.params} />
       {:else if scene.kind === 'dance'}
         <DanceFloor {code} {queue} {loopMode} params={scene.params} {tempo} {clock} />
+      {:else if scene.kind === 'interlude'}
+        <Interlude params={scene.params} name={party?.name ?? ''} {clock} />
+      {:else if scene.kind === 'recap'}
+        <Recap {code} {party} {queue} params={scene.params} {clock} />
       {:else if scene.kind === 'pipwall'}
         <PipWall {streams} {viewer} rev={rtcRev} {clock} />
       {:else}
@@ -156,7 +162,7 @@
   {#if scene.kind !== 'nowplaying'}
     <NowPlayingBar {music} />
   {/if}
-  {#if party && scene.kind !== 'lottery'}
+  {#if party && scene.kind !== 'lottery' && scene.kind !== 'recap'}
     <QrOverlay url={party.joinUrl} code={party.code} />
   {/if}
   {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}

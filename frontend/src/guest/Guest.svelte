@@ -147,6 +147,7 @@
     <header>
       <strong>{party?.name}</strong>
       <span class="muted">ahoj {guest.nickname}</span>
+      <a class="recap" href={`/recap/${code}`}>🎞 Recap</a>
     </header>
 
     {#if won}
@@ -250,6 +251,11 @@
     justify-content: space-between;
     align-items: baseline;
     padding: 6px 0 12px;
+  }
+  .recap {
+    color: var(--muted);
+    font-size: 14px;
+    text-decoration: none;
   }
   nav {
     display: grid;

@@ -115,6 +115,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/dance", s.guest(s.dance))
 	mux.HandleFunc("GET /api/parties/{code}/queue", s.party(s.getQueue))
 	mux.HandleFunc("GET /api/parties/{code}/music", s.party(s.getMusic))
+	mux.HandleFunc("GET /api/parties/{code}/recap", s.party(s.recap))
+	mux.HandleFunc("GET /api/parties/{code}/recap.zip", s.party(s.recapZip))
 	mux.HandleFunc("GET /files/{code}/{name}", s.serveFile)
 
 	// cockpit
@@ -130,6 +132,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/lottery", s.cockpit(s.lottery))
 	mux.HandleFunc("GET /api/parties/{code}/ideas", s.cockpit(s.listIdeas))
 	mux.HandleFunc("GET /api/parties/{code}/streams", s.cockpit(s.listStreams))
+	mux.HandleFunc("GET /api/parties/{code}/preflight", s.cockpit(s.preflight))
 	mux.HandleFunc("POST /api/parties/{code}/animate", s.cockpit(s.animateGallery))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))

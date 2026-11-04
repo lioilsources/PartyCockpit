@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap';
 
 export type Party = {
   code: string;
@@ -92,3 +92,24 @@ export type CockpitState = {
 };
 
 export const fileUrl = (code: string, file?: string) => (file ? `/files/${code}/${file}` : '');
+
+/** Guest-facing recap page of a party (M7): /join/<code> → /recap/<code>. */
+export const recapUrl = (joinUrl: string) => joinUrl.replace('/join/', '/recap/');
+
+/** Czech plural: 1 fotka, 2–4 fotky, 5+ fotek. */
+export const plural = (n: number, one: string, few: string, many: string) => (n === 1 ? one : n >= 2 && n <= 4 ? few : many);
+
+export type RecapItem = {
+  id: string;
+  kind: 'restyle' | 'upload' | 'dance' | 'sticker';
+  file?: string;
+  live?: string;
+  nickname?: string;
+  label?: string;
+  text?: string;
+  color?: string;
+};
+export type Recap = { name: string; code: string; endsAt: number; purgeAt: number; url: string; items: RecapItem[] };
+
+/** Cockpit preflight (M7): live checks of the evening runbook. */
+export type Check = { id: string; label: string; status: 'ok' | 'warn' | 'fail' | 'info'; detail: string };

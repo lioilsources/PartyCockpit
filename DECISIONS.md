@@ -133,3 +133,21 @@ multi-tenant (každá má vlastní kód + cockpit token), billing ani Ol1nPass i
 - ComfyUI na L40S běží jen v profilu D a GPU je sdílená (AlphaZero, Webtoon). Na party je
   potřeba domluvit okno v L40S session. Patch v `ComfyUI-LivePortraitKJ`
   (`face_alignment/api.py`, relativní import) se při `git pull` nodu ztratí.
+
+## D14: M7 vyladění show (2026-11-04)
+- **Recap** = přesně show fronta (schválené položky). Host si z `/recap/<kód>` stáhne jen
+  to, co už bylo na plátně: fotky, tance, živé portréty a vzkazy, jednotlivě nebo jako zip.
+  Přístup je stejný jako u `/queue`: stačí kód party. Stránka hlásí datum smazání
+  (konec party + 7 dní, janitor). Vlastní fotky řadí napřed podle přezdívky v telefonu.
+  To je jen pohodlí, ne řízení přístupu, protože přezdívky nejsou unikátní.
+- Show fronta už neposílá `meta.original` (jméno souboru originální fotky). Plátno ho
+  nepotřebovalo a s kódem party šlo originál stáhnout přes `/files`.
+- **Shader přestávka** (`interlude`): 5 vlastních fragment shaderů (WebGL1, plazma, tunel,
+  kaleidoskop, ekvalizér, polární záře). Pulzují s BeatClockem a energií zvuku plátna.
+  Bez zvuku odvozují energii z dob. Renderuje se na 0,6 rozlišení kvůli mini PC (`scale`).
+  Shadery z MirrorBooth/ShaderGen se nepřebíraly: mají jiné uniformy a vstup z kamery.
+- **Před party** v Cockpitu: živé kontroly ze serveru (`GET /preflight`: adresa v QR,
+  https, plátno, ping na Restyler a ComfyUI, poslední restyly, DJfy, tempo, moderace,
+  fronta ke schválení, disk, konec party) a ruční checklist v localStorage tabletu.
+  Ping na Restyler nesleduje přesměrování: login Cloudflare Access znamená špatný token.
+- Odloženo: titulky z Tlumočníka (další služba) a StyleMap sweep jako přechod.

@@ -417,6 +417,7 @@ func (s *Server) listIdeas(w http.ResponseWriter, r *http.Request, p store.Party
 var sceneKinds = map[string]bool{
 	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
 	"webtoon": true, "lottery": true, "blank": true, "pipwall": true, "dance": true,
+	"interlude": true, "recap": true, // M7
 }
 
 func (s *Server) setScene(w http.ResponseWriter, r *http.Request, p store.Party) {

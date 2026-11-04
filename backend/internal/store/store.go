@@ -400,10 +400,23 @@ func (s *Store) StageQueue(ctx context.Context, code string) ([]Asset, error) {
 		if err := rows.Scan(&a.ID, &a.PartyCode, &a.GuestID, &a.Kind, &a.SrcID, &a.File, &meta, &a.NSFWScore, &a.Status, &a.CreatedAt, &a.Live); err != nil {
 			return nil, err
 		}
-		a.Meta = json.RawMessage(meta)
+		a.Meta = publicMeta(meta)
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// publicMeta drops the name of the guest's original upload: the show queue goes
+// to every stage and recap viewer, the original never does (unless the operator
+// approved it as a fallback, in which case it is the asset's own file).
+func publicMeta(raw string) json.RawMessage {
+	var m map[string]any
+	if json.Unmarshal([]byte(raw), &m) != nil || m["original"] == nil {
+		return json.RawMessage(raw)
+	}
+	delete(m, "original")
+	b, _ := json.Marshal(m)
+	return b
 }
 
 // AnimationOf returns the newest live/dance asset made from src (any status).
@@ -480,6 +493,25 @@ func (s *Store) AbandonRunningJobs(ctx context.Context) ([]string, error) {
 	rows.Close()
 	_, err = s.db.ExecContext(ctx, "UPDATE jobs SET status = 'failed', error = 'server restarted', finished_at = ? WHERE status IN ('queued','running')", s.Now().UnixMilli())
 	return ids, err
+}
+
+// RecentJobs returns the party's newest jobs whose intent starts with prefix.
+func (s *Store) RecentJobs(ctx context.Context, code, prefix string, n int) ([]Job, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, asset_id, intent, provider, external_id, status, error, created_at, finished_at
+		FROM jobs WHERE party_code = ? AND intent LIKE ? ORDER BY created_at DESC LIMIT ?`, code, prefix+"%", n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Job
+	for rows.Next() {
+		j := Job{PartyCode: code}
+		if err := rows.Scan(&j.ID, &j.AssetID, &j.Intent, &j.Provider, &j.ExternalID, &j.Status, &j.Error, &j.CreatedAt, &j.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
 }
 
 type JobStats struct {
