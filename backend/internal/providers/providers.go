@@ -330,7 +330,18 @@ const MaxSide = 1536
 // Normalise decodes a guest upload, scales it to ≤ MaxSide and re-encodes it as
 // JPEG, which also drops EXIF/GPS metadata. Orientation is fixed by the guest
 // page (the browser applies EXIF when drawing to canvas).
+// MaxUploadPixels bounds a decoded upload: a small PNG can claim 20 000 ×
+// 20 000 px and take gigabytes to decode on the party box (D19).
+const MaxUploadPixels = 36_000_000
+
 func Normalise(raw []byte) ([]byte, int, int, error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("decode upload: %w", err)
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width*cfg.Height > MaxUploadPixels {
+		return nil, 0, 0, fmt.Errorf("fotka je moc velká (max 36 Mpx)")
+	}
 	src, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("decode upload: %w", err)

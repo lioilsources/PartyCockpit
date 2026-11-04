@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { api, store } from '../lib/api';
   import { connect } from '../lib/ws';
-  import type { Asset, Guest, MusicSnapshot, Party } from '../lib/types';
+  import { ownFileUrl, type Asset, type Guest, type MusicSnapshot, type Party } from '../lib/types';
   import Photo from './Photo.svelte';
   import Music from './Music.svelte';
   import Live from './Live.svelte';
@@ -250,10 +250,10 @@
                 <span class="mini" style:background={a.meta.color}>✍️</span>
                 <span class="t">{a.meta.text}</span>
               {:else if a.kind === 'live' || a.kind === 'dance'}
-                {#if a.file}<Clip src={`/files/${code}/${a.file}`} cls="mini" />{:else}<span class="mini">{a.kind === 'dance' ? '💃' : '✨'}</span>{/if}
+                {#if a.file}<Clip src={ownFileUrl(code, guest.id, a.file)} cls="mini" />{:else}<span class="mini">{a.kind === 'dance' ? '💃' : '✨'}</span>{/if}
                 <span class="t">{a.kind === 'dance' ? `tanec ${a.meta.motionLabel ?? ''}` : 'živý portrét'}</span>
               {:else}
-                {#if a.file}<img src={`/files/${code}/${a.file}`} alt="" />{:else}<span class="mini">🎨</span>{/if}
+                {#if a.file}<img src={ownFileUrl(code, guest.id, a.file)} alt="" />{:else}<span class="mini">🎨</span>{/if}
                 <span class="t">{a.meta.styleLabel}</span>
               {/if}
               <span class="st">{statusLabel[a.status] ?? a.status}</span>

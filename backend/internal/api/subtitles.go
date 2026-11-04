@@ -77,6 +77,15 @@ func (s *Server) clearSubtitles(w http.ResponseWriter, r *http.Request, p store.
 	w.WriteHeader(204)
 }
 
+// micAuth: the mic socket takes a ticket (or the token) like the cockpit socket.
+func (s *Server) micAuth(w http.ResponseWriter, r *http.Request, p store.Party) {
+	if !s.cockpitAuthorized(r, p) {
+		writeErr(w, 401, "neplatný cockpit token")
+		return
+	}
+	s.micSocket(w, r, p)
+}
+
 // micSocket: text {"type":"start","langA":"cs","langB":"en"}, then binary PCM16LE
 // 16 kHz mono frames, {"type":"end"} after each utterance (the browser's VAD) and
 // {"type":"stop"}. The server answers {"type":"ready"} or {"type":"error"}.
@@ -85,7 +94,7 @@ func (s *Server) micSocket(w http.ResponseWriter, r *http.Request, p store.Party
 		writeErr(w, 409, "titulky z mikrofonu potřebují TRANSLATOR_URL")
 		return
 	}
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+	conn, err := websocket.Accept(w, r, s.acceptOptions())
 	if err != nil {
 		return
 	}

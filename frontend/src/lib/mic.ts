@@ -38,7 +38,7 @@ export class Mic {
 
   constructor(private onChange: () => void) {}
 
-  async start(code: string, token: string, langA: string, langB: string) {
+  async start(code: string, ticket: string, langA: string, langB: string) {
     if (this.state !== 'off' && this.state !== 'error') return;
     this.set('starting');
     try {
@@ -56,7 +56,7 @@ export class Mic {
       src.connect(this.node);
 
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      const q = new URLSearchParams({ token });
+      const q = new URLSearchParams({ ticket });
       this.ws = new WebSocket(`${proto}://${location.host}/ws/parties/${code}/mic?${q}`);
       this.ws.binaryType = 'arraybuffer';
       this.ws.onopen = () => this.ws?.send(JSON.stringify({ type: 'start', langA, langB }));

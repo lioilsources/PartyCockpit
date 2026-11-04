@@ -89,10 +89,14 @@ export type CockpitState = {
   ideas: Idea[];
   jobs: { intent: string; status: string; count: number; avgMs: number }[];
   clients: Record<string, number>;
-  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string; subtitles: boolean; stageKey: string };
+  config: { restyle: string; animate: string; moderation: string; autoApproveMax: number; djfyUrl: string; subtitles: boolean; stageKey: string; fileKey: string };
 };
 
-export const fileUrl = (code: string, file?: string) => (file ? `/files/${code}/${file}` : '');
+/** Party file: approved ones for anyone; `key` (Cockpit fileKey) opens pending ones too (D19). */
+export const fileUrl = (code: string, file?: string, key?: string) => (file ? `/files/${code}/${file}${key ? `?k=${key}` : ''}` : '');
+
+/** A guest's own file in any state, through their guest endpoint (D19). */
+export const ownFileUrl = (code: string, guestId: string, file?: string) => (file ? `/api/parties/${code}/guests/${guestId}/files/${file}` : '');
 
 /** Guest-facing recap page of a party (M7): /join/<code> → /recap/<code>. */
 export const recapUrl = (joinUrl: string) => joinUrl.replace('/join/', '/recap/');

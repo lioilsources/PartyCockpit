@@ -12,9 +12,11 @@
   let { code }: { code: string } = $props();
 
   // token: ?token=… (link from Home) or remembered per party
+  // #token= (or ?token= from older links) is read once, stored and dropped from the URL (D19)
   const qs = new URLSearchParams(location.search);
-  let token = $state(qs.get('token') ?? store.get(`pc.cockpit.${code}`) ?? '');
-  if (qs.get('token')) {
+  const fromUrl = new URLSearchParams(location.hash.slice(1)).get('token') ?? qs.get('token');
+  let token = $state(fromUrl ?? store.get(`pc.cockpit.${code}`) ?? '');
+  if (fromUrl) {
     store.set(`pc.cockpit.${code}`, token);
     history.replaceState(null, '', location.pathname);
   }
@@ -53,10 +55,23 @@
         else if (m.type === 'subtitle.clear') subs = [];
       },
       (o) => (online = o),
-      { token },
+      async () => ({ ticket: await socketTicket() }),
     );
     viewer?.destroy();
     viewer = new Viewer(sock.send, party?.iceServers ?? [], () => rtcRev++);
+  }
+
+  // a single-use ticket instead of the token in the socket URL (D19)
+  async function socketTicket() {
+    return (await api.post<{ ticket: string }>(`/api/parties/${code}/cockpit/ticket`, {}, token)).ticket;
+  }
+
+  async function downloadIdeas() {
+    const r = await fetch(p('/ideas'), { headers: { Authorization: `Bearer ${token}` } });
+    const url = URL.createObjectURL(new Blob([await r.text()], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `namety-${code}.json` });
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // check the token once, then go live
@@ -106,7 +121,7 @@
     if (micState === 'off' || micState === 'error') {
       store.set('pc.sub.langA', langA);
       store.set('pc.sub.langB', langB);
-      mic.start(code, token, langA, langB);
+      socketTicket().then((t) => mic.start(code, t, langA, langB)).catch((e) => (err = e.message));
     } else mic.stop();
   }
   function sendTyped(e: Event) {
@@ -399,7 +414,7 @@
               {#if a.kind === 'sticker'}
                 <div class="sticker" style:background={a.meta.color}>{a.meta.text}</div>
               {:else}
-                <Clip src={fileUrl(code, a.file)} />
+                <Clip src={fileUrl(code, a.file, st?.config.fileKey)} />
               {/if}
               <div class="meta">
                 <strong>{a.meta.nickname}</strong>
@@ -427,7 +442,7 @@
             <div class="cards">
               {#each rejected as a (a.id)}
                 <div class="card mini">
-                  {#if a.kind === 'sticker'}<div class="sticker" style:background={a.meta.color}>{a.meta.text}</div>{:else}<img src={fileUrl(code, a.file)} alt="" />{/if}
+                  {#if a.kind === 'sticker'}<div class="sticker" style:background={a.meta.color}>{a.meta.text}</div>{:else}<img src={fileUrl(code, a.file, st?.config.fileKey)} alt="" />{/if}
                   <button onclick={() => approve(a)}>vrátit</button>
                 </div>
               {/each}
@@ -585,7 +600,7 @@
       <section>
         <h2>
           Náměty na webtoon ({st?.ideas.length ?? 0})
-          <a href={`${p('/ideas')}?download=1&token=${token}`} download>stáhnout JSON</a>
+          <button onclick={downloadIdeas}>stáhnout JSON</button>
         </h2>
         <ul class="ideas">
           {#each [...(st?.ideas ?? [])].reverse() as i (i.id)}

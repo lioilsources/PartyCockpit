@@ -210,10 +210,21 @@ func (s *Store) GuestIdeas(ctx context.Context, code, guestID string) (int, erro
 	return n, err
 }
 
-// AssetByFile finds the asset that owns a file (newest first: a fallback
-// restyle shares its original's file name).
-func (s *Store) AssetByFile(ctx context.Context, code, file string) ([]Asset, error) {
-	return s.queryAssets(ctx, "SELECT "+assetCols+" FROM assets WHERE party_code = ? AND file = ? ORDER BY created_at DESC", code, file)
+// FilePublic reports whether a party file may be served to anyone with the
+// code: it belongs to an approved asset (a fallback restyle shares its
+// original's file), or it is the still of an approved dance (D19).
+func (s *Store) FilePublic(ctx context.Context, code, file string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM assets WHERE party_code = ? AND status = 'approved'
+		AND (file = ? OR (kind = 'dance' AND json_extract(meta, '$.photo') = ?))`, code, file, file).Scan(&n)
+	return n > 0, err
+}
+
+// GuestOwnsFile reports whether the file belongs to one of the guest's assets.
+func (s *Store) GuestOwnsFile(ctx context.Context, code, guestID, file string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM assets WHERE party_code = ? AND guest_id = ? AND file = ?", code, guestID, file).Scan(&n)
+	return n > 0, err
 }
 
 // ExpiredParties returns parties whose end lies more than grace in the past.

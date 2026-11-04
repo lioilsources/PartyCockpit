@@ -449,7 +449,7 @@ func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitStat
 	st.Config = map[string]any{
 		"restyle": s.Restyler.Name(), "animate": s.Animator.Name(), "moderation": s.Cfg.Moderation,
 		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL, "subtitles": s.Subtitles != nil,
-		"stageKey": p.StageKey,
+		"stageKey": p.StageKey, "fileKey": fileKey(p),
 	}
 	return st, nil
 }

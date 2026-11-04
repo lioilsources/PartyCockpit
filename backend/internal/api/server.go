@@ -58,6 +58,8 @@ type Server struct {
 	mmu  sync.Mutex
 	mics map[string]*mic // party → the MC microphone feeding subtitles
 
+	tickets tickets // single-use cockpit socket tickets
+
 	gmu   sync.Mutex
 	draws map[string][]string // party → guest ids of the last lottery draw
 	games map[string]*game    // party → the intermission game in progress
@@ -75,6 +77,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.tempo, s.tap, s.lastReact = map[string]Tempo{}, map[string]Tempo{}, map[string]time.Time{}
 	s.streams = map[string]map[string]*Stream{}
 	s.mics = map[string]*mic{}
+	s.tickets.m = map[string]ticket{}
 	s.limits = newLimiter(func() time.Time { return s.Store.Now() }, writeRate, writeBurst)
 	s.gameInputs = newLimiter(time.Now, 30, 30)
 	s.draws, s.games = map[string][]string{}, map[string]*game{}
@@ -131,6 +134,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/stream", s.guestWrite(s.startStream))
 	mux.HandleFunc("DELETE /api/parties/{code}/guests/{gid}/stream", s.guestWrite(s.stopStream))
 	mux.HandleFunc("POST /api/parties/{code}/guests/{gid}/dance", s.guestWrite(s.dance))
+	mux.HandleFunc("GET /api/parties/{code}/guests/{gid}/files/{name}", s.guest(s.guestFile))
 	mux.HandleFunc("GET /api/parties/{code}/queue", s.party(s.getQueue))
 	mux.HandleFunc("GET /api/parties/{code}/music", s.party(s.getMusic))
 	mux.HandleFunc("GET /api/parties/{code}/recap", s.party(s.recap))
@@ -139,6 +143,7 @@ func (s *Server) Routes() http.Handler {
 
 	// cockpit
 	mux.HandleFunc("GET /api/parties/{code}/cockpit", s.cockpit(s.cockpitState))
+	mux.HandleFunc("POST /api/parties/{code}/cockpit/ticket", s.cockpit(s.issueTicket))
 	mux.HandleFunc("PATCH /api/parties/{code}", s.cockpit(s.patchParty))
 	mux.HandleFunc("POST /api/parties/{code}/assets/{id}/approve", s.cockpit(s.moderate("approved")))
 	mux.HandleFunc("POST /api/parties/{code}/assets/{id}/reject", s.cockpit(s.moderate("rejected")))
@@ -155,7 +160,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/parties/{code}/preflight", s.cockpit(s.preflight))
 	mux.HandleFunc("POST /api/parties/{code}/subtitle", s.cockpit(s.typedSubtitle))
 	mux.HandleFunc("DELETE /api/parties/{code}/subtitle", s.cockpit(s.clearSubtitles))
-	mux.HandleFunc("GET /ws/parties/{code}/mic", s.cockpit(s.micSocket))
+	mux.HandleFunc("GET /ws/parties/{code}/mic", s.party(s.micAuth))
 	mux.HandleFunc("POST /api/parties/{code}/animate", s.cockpit(s.animateGallery))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))
@@ -258,6 +263,11 @@ func (s *Server) cockpit(h partyHandler) http.HandlerFunc {
 
 func (s *Server) admin(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// the list carries every party's cockpit token: never without a token (D19)
+		if r.Method == "GET" && (s.Cfg.AdminToken == "" || !eq(r.Header.Get("X-Admin-Token"), s.Cfg.AdminToken)) {
+			writeErr(w, 401, "seznam party jen s admin tokenem (PC_ADMIN_TOKEN)")
+			return
+		}
 		if s.Cfg.AdminToken != "" && !eq(r.Header.Get("X-Admin-Token"), s.Cfg.AdminToken) {
 			writeErr(w, 401, "neplatný admin token")
 			return
@@ -319,7 +329,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case hub.Cockpit:
-		if !eq(bearer(r), p.CockpitToken) {
+		if !s.cockpitAuthorized(r, p) {
 			writeErr(w, 401, "neplatný cockpit token")
 			return
 		}
@@ -338,7 +348,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "role must be stage|cockpit|guest|streamer")
 		return
 	}
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true}) // LAN, any origin
+	conn, err := websocket.Accept(w, r, s.acceptOptions())
 	if err != nil {
 		return
 	}
@@ -407,16 +417,6 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) partyDir(code string) string { return filepath.Join(s.Cfg.DataDir, "party", code) }
-
-func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
-	code, name := strings.ToUpper(r.PathValue("code")), r.PathValue("name")
-	if strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") || strings.ContainsAny(code, `/\.`) {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	http.ServeFile(w, r, filepath.Join(s.partyDir(code), name))
-}
 
 // janitor deletes parties (rows + files) 7 days after they ended (plan §8).
 func (s *Server) janitor() {

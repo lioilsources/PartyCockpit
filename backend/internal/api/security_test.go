@@ -1,13 +1,18 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 )
 
 func (e *env) guest(nick string) string {
@@ -149,4 +154,115 @@ func (e *env) do2json(method, path string) string {
 	defer res.Body.Close()
 	b, _ := io.ReadAll(res.Body)
 	return string(b)
+}
+
+func TestSocketTickets(t *testing.T) {
+	e := newEnv(t)
+	var tk struct{ Ticket string }
+	if st := e.do("POST", "/api/parties/"+e.code+"/cockpit/ticket", nil, &tk); st != 200 || tk.Ticket == "" {
+		t.Fatalf("ticket: %d", st)
+	}
+	if st := e.dialStatus("role=cockpit&ticket=" + tk.Ticket); st != 101 {
+		t.Fatalf("fresh ticket: %d, want 101", st)
+	}
+	if st := e.dialStatus("role=cockpit&ticket=" + tk.Ticket); st != 401 {
+		t.Fatalf("reused ticket: %d, want 401", st)
+	}
+	e.do("POST", "/api/parties/"+e.code+"/cockpit/ticket", nil, &tk)
+	real := e.srv.Store.Now
+	e.srv.Store.Now = func() time.Time { return real().Add(31 * time.Second) }
+	defer func() { e.srv.Store.Now = real }()
+	if st := e.dialStatus("role=cockpit&ticket=" + tk.Ticket); st != 401 {
+		t.Fatalf("expired ticket: %d, want 401", st)
+	}
+}
+
+func TestPartyListNeedsAdminToken(t *testing.T) {
+	e := newEnv(t) // no PC_ADMIN_TOKEN
+	if st := e.do("GET", "/api/parties", nil, nil); st != 401 {
+		t.Fatalf("list without an admin token configured: %d, want 401", st)
+	}
+	if st := e.do("POST", "/api/parties", map[string]any{"name": "další"}, nil); st != 201 {
+		t.Fatalf("create stays open at home: %d", st)
+	}
+}
+
+func TestFilesByStatus(t *testing.T) {
+	e := newEnv(t)
+	gid := e.guest("Fotka")
+	other := e.guest("Cizí")
+	photo := e.upload(gid)
+	a := e.waitAsset(gid, photo.ID, "pending")
+	var orig struct {
+		Assets []struct{ Kind, File, Status string }
+	}
+	e.do("GET", "/api/parties/"+e.code+"/guests/"+gid+"/assets", nil, &orig)
+	source := ""
+	for _, x := range orig.Assets {
+		if x.Kind == "upload" {
+			source = x.File
+		}
+	}
+	get := func(path string) int {
+		res, err := http.Get(e.ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	pub := "/files/" + e.code + "/"
+	var cfg struct{ Config map[string]any }
+	e.do("GET", "/api/parties/"+e.code+"/cockpit", nil, &cfg)
+	key, _ := cfg.Config["fileKey"].(string)
+	if get(pub+a.File) != 404 {
+		t.Fatal("a pending file must not be public")
+	}
+	if get(pub+a.File+"?k="+key) != 200 {
+		t.Fatal("the cockpit's file key opens pending files")
+	}
+	own := "/api/parties/" + e.code + "/guests/"
+	if get(own+gid+"/files/"+a.File) != 200 || get(own+other+"/files/"+a.File) != 404 {
+		t.Fatal("own file for the owner only")
+	}
+	e.do("POST", "/api/parties/"+e.code+"/assets/"+photo.ID+"/approve", nil, nil)
+	if get(pub+a.File) != 200 {
+		t.Fatal("an approved file is public")
+	}
+	if source != "" && source != a.File && get(pub+source) != 404 {
+		t.Fatal("the original upload stays private after its restyle is approved")
+	}
+}
+
+func TestSocketOrigin(t *testing.T) {
+	e := newEnv(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	url := "ws" + strings.TrimPrefix(e.ts.URL, "http") + "/ws/parties/" + e.code + "?role=guest"
+	_, res, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPHeader: http.Header{"Origin": {"https://evil.example"}}})
+	if err == nil || res == nil || res.StatusCode != 403 {
+		t.Fatalf("foreign origin must be refused: %v", err)
+	}
+}
+
+func TestHugeUploadRefused(t *testing.T) {
+	e := newEnv(t)
+	gid := e.guest("Velká")
+	img := image.NewGray(image.Rect(0, 0, 8000, 8000)) // 64 Mpx, a small file
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	fw, _ := mw.CreateFormFile("photo", "big.png")
+	fw.Write(buf.Bytes())
+	mw.WriteField("style", "anime")
+	mw.Close()
+	res, err := http.Post(e.ts.URL+"/api/parties/"+e.code+"/guests/"+gid+"/photos", mw.FormDataContentType(), &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("64 Mpx upload: %d, want 400", res.StatusCode)
+	}
 }

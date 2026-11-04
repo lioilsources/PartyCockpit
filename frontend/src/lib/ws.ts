@@ -13,16 +13,31 @@ export function connect(
   role: Role,
   onMsg: (m: WsMsg) => void,
   onStatus: (online: boolean) => void,
-  params: Record<string, string> = {},
+  // a function is called before every (re)connect, e.g. for a fresh single-use ticket
+  params: Record<string, string> | (() => Promise<Record<string, string>>) = {},
 ): Socket {
   let ws: WebSocket | null = null;
   let closed = false;
   let retry = 1000;
   let timer: ReturnType<typeof setTimeout>;
 
-  const open = () => {
+  const retryLater = () => {
+    onStatus(false);
+    if (closed) return;
+    timer = setTimeout(open, retry);
+    retry = Math.min(retry * 2, 15000);
+  };
+  const open = async () => {
+    let extra: Record<string, string>;
+    try {
+      extra = typeof params === 'function' ? await params() : params;
+    } catch {
+      retryLater();
+      return;
+    }
+    if (closed) return;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const q = new URLSearchParams({ role, ...params });
+    const q = new URLSearchParams({ role, ...extra });
     ws = new WebSocket(`${proto}://${location.host}/ws/parties/${code}?${q}`);
     ws.onopen = () => {
       retry = 1000;
@@ -35,12 +50,7 @@ export function connect(
         /* ignore */
       }
     };
-    ws.onclose = () => {
-      onStatus(false);
-      if (closed) return;
-      timer = setTimeout(open, retry);
-      retry = Math.min(retry * 2, 15000);
-    };
+    ws.onclose = retryLater;
   };
   open();
   return {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api } from '../lib/api';
-  import { fileUrl, type Asset, type Motion } from '../lib/types';
+  import { ownFileUrl, type Asset, type Motion } from '../lib/types';
 
   // "Roztanči mě" (M4): pick one of my finished photos and a dance; the GPU makes a
   // short clip, the operator approves it and it plays in the Tančírna scene.
@@ -44,7 +44,7 @@
 {:else}
   <div class="pick">
     {#each photos.slice(0, 8) as a (a.id)}
-      <button class:sel={photo === a.id} onclick={() => (photo = a.id)}><img src={fileUrl(code, a.file)} alt="" /></button>
+      <button class:sel={photo === a.id} onclick={() => (photo = a.id)}><img src={ownFileUrl(code, guestId, a.file)} alt="" /></button>
     {/each}
   </div>
   <div class="moves">
