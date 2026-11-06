@@ -1,0 +1,30 @@
+.meter {
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+  transition: width 0.1s;
+}
+.meter span.on {
+  background: var(--green);
+}
+.subs {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+.subs li.partial {
+  color: var(--muted);
+}
+.subs span {
+  color: var(--yellow);
+}

@@ -1,0 +1,15 @@
+.stream video,
+.novid {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #000;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+.stream.live {
+  outline: 2px solid var(--red);
+}

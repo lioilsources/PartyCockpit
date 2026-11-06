@@ -1,0 +1,48 @@
+.header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.header code {
+  color: var(--yellow);
+}
+.links {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+.panic {
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding: 0.7em 1.6em;
+}
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-right: 6px;
+}
+.dot.on {
+  background: var(--green);
+}
+.ends {
+  color: var(--muted);
+  font-size: 14px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.badge {
+  font-size: 0.75rem;
+  color: var(--cyan);
+  margin-left: 8px;
+  vertical-align: middle;
+}

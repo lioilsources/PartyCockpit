@@ -1,0 +1,13 @@
+.tap {
+  font-weight: 700;
+  min-width: 120px;
+  padding: 1em;
+  background: var(--pink);
+  border-color: var(--pink);
+}
+.react {
+  font-size: 1.4rem;
+}
+.code {
+  max-width: 160px;
+}

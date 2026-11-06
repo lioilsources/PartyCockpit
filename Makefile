@@ -5,11 +5,14 @@ BIN := bin/partycockpit
 
 all: build
 
+# both UIs: the Svelte app at /, the React Cockpit (D21) at /react/
 web:
 	cd frontend && npm ci --no-audit --no-fund && npm run build
-	rm -rf backend/internal/web/dist/assets
-	mkdir -p backend/internal/web/dist
+	cd frontend-react && npm ci --no-audit --no-fund && npm run build
+	rm -rf backend/internal/web/dist/assets backend/internal/web/dist/react
+	mkdir -p backend/internal/web/dist/react
 	cp -R frontend/dist/. backend/internal/web/dist/
+	cp -R frontend-react/dist/. backend/internal/web/dist/react/
 
 build: web
 	cd backend && CGO_ENABLED=0 go build -trimpath -o ../$(BIN) ./cmd/partycockpit
@@ -17,9 +20,10 @@ build: web
 run: build
 	set -a; [ -f .env ] && . ./.env; set +a; ./$(BIN)
 
-# backend on :8098 + vite dev server on :5173 (proxies /api, /ws, /files)
+# backend on :8098 + vite on :5173 (Svelte) and :5174/react/ (React Cockpit); both proxy /api, /ws, /files
 dev:
 	(cd backend && set -a && ([ -f ../.env ] && . ../.env || true) && set +a && go run ./cmd/partycockpit) & \
+	(cd frontend-react && npm run dev) & \
 	cd frontend && npm run dev
 
 test:
@@ -27,6 +31,7 @@ test:
 
 check: test shellcheck
 	cd frontend && npm run check && npm run build
+	cd frontend-react && npm run check && npm run build
 
 # party box scripts (deploy/box); skipped when shellcheck is not installed
 shellcheck:

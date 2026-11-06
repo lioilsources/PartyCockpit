@@ -6,6 +6,7 @@
 deploy/data/
 node_modules/
 frontend/dist/
+frontend-react/dist/
 backend/internal/web/dist/*
 !backend/internal/web/dist/.gitkeep
 .DS_Store

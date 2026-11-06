@@ -1,0 +1,79 @@
+/* Shared panel pieces, ported from Cockpit.svelte. */
+.section {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-top: 14px;
+  min-width: 0;
+}
+.h2 {
+  font-size: 0.95rem;
+  margin: 0 0 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.h2 strong {
+  color: var(--yellow);
+}
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.small {
+  font-size: 0.88rem;
+}
+.row label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.row label input:not([type='checkbox']) {
+  width: 7em;
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.card {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+.card img,
+.card video {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.sticker {
+  font-family: var(--hand);
+  color: #1d1208;
+  font-size: 1.4rem;
+  padding: 10px;
+  border-radius: 6px;
+  min-height: 90px;
+  word-break: break-word;
+}
+.meta {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+}
+.warn {
+  color: var(--yellow);
+}
+.hint {
+  font-size: 0.88rem;
+}

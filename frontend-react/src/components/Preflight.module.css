@@ -1,0 +1,67 @@
+.preflight {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin: 14px 0;
+}
+.preflight summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.summary {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--green);
+}
+.summary.bad {
+  color: var(--red);
+}
+.summary.warn {
+  color: var(--yellow);
+}
+.pf {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.pf h3 {
+  font-size: 15px;
+  margin: 12px 0 6px;
+}
+.pf ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.pf li {
+  border-left: 4px solid var(--line);
+  padding: 2px 8px;
+}
+.pf li.ok {
+  border-color: var(--green);
+}
+.pf li.warn {
+  border-color: var(--yellow);
+}
+.pf li.fail {
+  border-color: var(--red);
+}
+.pf li.info {
+  border-color: var(--cyan);
+}
+.pf b {
+  margin-right: 4px;
+}
+.pf label {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.small {
+  font-size: 0.88rem;
+}

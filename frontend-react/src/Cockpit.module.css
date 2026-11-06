@@ -1,0 +1,10 @@
+.ck {
+  padding: 16px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: 0 14px;
+}
