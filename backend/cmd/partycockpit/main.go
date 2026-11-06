@@ -104,7 +104,7 @@ func run() error {
 		DJfy:     djfy.New(cfg.DJfyURL),
 		Catalog:  cat,
 		Restyler: restyler, Animator: animator, Classifier: classifier,
-		Subtitles: subs, Glyphs: sheets,
+		Subtitles: subs, Glyphs: sheets, Version: version,
 		Web: web.FS(),
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

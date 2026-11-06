@@ -22,6 +22,7 @@
   import Subtitles from './Subtitles.svelte';
   import StyleSweep from './scenes/StyleSweep.svelte';
   import Kruh from './scenes/Kruh.svelte';
+  import PairingQr from './PairingQr.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
 
@@ -54,6 +55,10 @@
   let queue = $state<Asset[]>(cached?.queue ?? []);
   let music = $state<MusicSnapshot | null>(cached?.music ?? null);
   let online = $state(false);
+  let pairing = $state<string | null>(null); // party box: QR that makes a phone the Cockpit
+  // after 30 s offline the stage says so in words, not just a dot
+  let offlineSince = $state(0);
+  let now = $state(Date.now());
   let reactions: Reactions;
   let subtitles: Subtitles;
   let kruh = $state<Kruh | null>(null);
@@ -96,6 +101,9 @@
         case 'reaction':
           reactions?.add(m.data.emoji);
           break;
+        case 'pairing':
+          pairing = m.data?.url ?? null;
+          return;
         case 'panic':
           reactions?.clear();
           subtitles?.clear();
@@ -121,7 +129,10 @@
       }
       save();
     },
-    (o) => (online = o),
+    (o) => {
+      online = o;
+      offlineSince = o ? 0 : offlineSince || Date.now();
+    },
     { key: stageKey },
   );
 
@@ -131,7 +142,14 @@
     clock.enableAudio().catch(() => (needsAudioClick = true));
   }
 
+  // a fresh box with nothing cached shows an empty screen while offline: retry the page
+  const ticker = setInterval(() => {
+    now = Date.now();
+    if (!online && !party && offlineSince && now - offlineSince > 60000) location.reload();
+  }, 5000);
+
   onDestroy(() => {
+    clearInterval(ticker);
     viewer.destroy();
     sock.close();
     clock.destroy();
@@ -196,7 +214,7 @@
       {:else if scene.kind === 'dance'}
         <DanceFloor {code} {queue} {loopMode} params={scene.params} {tempo} {clock} />
       {:else if scene.kind === 'interlude'}
-        <Interlude params={scene.params} name={party?.name ?? ''} {clock} />
+        <Interlude params={{ scale: party?.box?.scale, ...scene.params }} name={party?.name ?? ''} {clock} />
       {:else if scene.kind === 'recap'}
         <Recap {code} {party} {queue} params={scene.params} {clock} />
       {:else if scene.kind === 'game'}
@@ -228,6 +246,8 @@
     <QrOverlay url={party.joinUrl} code={party.code} />
   {/if}
   {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}
+  {#if !online && offlineSince && now - offlineSince > 30000}<div class="offline-label">server nedostupný, jedu z paměti</div>{/if}
+  {#if pairing}<PairingQr url={pairing} />{/if}
   {#if !stageKey}<div class="nokey">Plátno otevři tlačítkem „Otevřít plátno“ v Cockpitu (nese klíč).</div>{/if}
   {#if needsAudioClick}<div class="hint">klikni pro zapnutí mikrofonu (beat)</div>{/if}
 </div>
@@ -266,6 +286,14 @@
     border-radius: 50%;
     background: var(--red);
     opacity: 0.7;
+  }
+  .offline-label {
+    position: absolute;
+    top: 10px;
+    left: 32px;
+    font-size: 13px;
+    color: var(--red);
+    opacity: 0.8;
   }
   .nokey {
     position: absolute;

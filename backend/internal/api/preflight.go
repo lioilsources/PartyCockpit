@@ -146,6 +146,31 @@ func (s *Server) preflight(w http.ResponseWriter, r *http.Request, p store.Party
 		add("pending", "Ke schválení", "warn", fmt.Sprintf("%d čeká", len(pending)))
 	}
 
+	// party box (D20): certificate and temperature
+	if s.Cfg.Box {
+		if na, err := certNotAfter(s.Cfg.TLSCert); err == nil {
+			days := int(time.Until(na).Hours() / 24)
+			switch {
+			case days < 0:
+				add("cert", "Certifikát", "fail", "vypršel, kamera a mikrofon v telefonech nepojedou. Obnov doma: sudo /opt/partycockpit/bin/renew-cert.sh")
+			case days < 14:
+				add("cert", "Certifikát", "warn", fmt.Sprintf("vyprší za %d dní, obnov ho, dokud je box na internetu", days))
+			default:
+				add("cert", "Certifikát", "ok", fmt.Sprintf("platí ještě %d dní", days))
+			}
+		}
+		if t, ok := cpuTemp(); ok {
+			switch {
+			case t >= 80:
+				add("temp", "Teplota boxu", "fail", fmt.Sprintf("%.0f °C, box zpomaluje: zkontroluj chladič a větrání", t))
+			case t >= 75:
+				add("temp", "Teplota boxu", "warn", fmt.Sprintf("%.0f °C", t))
+			default:
+				add("temp", "Teplota boxu", "ok", fmt.Sprintf("%.0f °C", t))
+			}
+		}
+	}
+
 	// box health
 	if free := freeBytes(s.Cfg.DataDir); free >= 0 {
 		gb := float64(free) / (1 << 30)

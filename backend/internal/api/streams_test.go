@@ -32,6 +32,12 @@ type env struct {
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	return newEnvWith(t, nil)
+}
+
+// newEnvWith lets a test change the configuration before the server starts.
+func newEnvWith(t *testing.T, tweak func(*config.Config)) *env {
+	t.Helper()
 	dir := t.TempDir()
 	st, err := store.Open(filepath.Join(dir, "t.db"))
 	if err != nil {
@@ -43,6 +49,9 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	cfg := config.Config{DataDir: dir, PartyTTL: time.Hour, Workers: 1, ICEServers: json.RawMessage("[]")}
+	if tweak != nil {
+		tweak(&cfg)
+	}
 	s := &Server{
 		Cfg: cfg, Store: st, Hub: hub.New(),
 		Gallery: gallery.New("http://127.0.0.1:1", filepath.Join(dir, "gc"), false, nil),

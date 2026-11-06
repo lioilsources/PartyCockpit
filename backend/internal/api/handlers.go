@@ -84,10 +84,16 @@ type PublicParty struct {
 	Clients any         `json:"clients"`
 	// IceServers for RTCPeerConnection; empty on a LAN party (host candidates suffice).
 	IceServers json.RawMessage `json:"iceServers"`
+	// Box: stage defaults on a party box (D20); absent elsewhere.
+	Box *BoxInfo `json:"box,omitempty"`
 }
 
 func (s *Server) joinURL(r *http.Request, code string) string {
 	base := s.Cfg.PublicURL
+	if base == "" && s.Cfg.Box && isLoopbackHost(r.Host) {
+		// the box's own stage asks over 127.0.0.1; phones need the LAN address
+		base = s.boxBaseURL()
+	}
 	if base == "" {
 		scheme := "http"
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
@@ -100,7 +106,11 @@ func (s *Server) joinURL(r *http.Request, code string) string {
 
 func (s *Server) publicParty(r *http.Request, p store.Party) (PublicParty, error) {
 	sc, err := s.Store.Scene(r.Context(), p.Code)
-	return PublicParty{Party: p, JoinURL: s.joinURL(r, p.Code), Scene: sc, Clients: s.Hub.Counts(p.Code), IceServers: s.Cfg.ICEServers}, err
+	pub := PublicParty{Party: p, JoinURL: s.joinURL(r, p.Code), Scene: sc, Clients: s.Hub.Counts(p.Code), IceServers: s.Cfg.ICEServers}
+	if s.Cfg.Box {
+		pub.Box = &BoxInfo{Scale: s.Cfg.StageScale}
+	}
+	return pub, err
 }
 
 func (s *Server) getParty(w http.ResponseWriter, r *http.Request, p store.Party) {

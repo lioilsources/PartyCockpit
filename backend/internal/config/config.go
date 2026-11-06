@@ -61,6 +61,14 @@ type Config struct {
 	TranslatorURL   string // TRANSLATOR_URL
 	TranslatorToken string // TRANSLATOR_TOKEN
 
+	// Party box (D20): a Raspberry Pi or mini PC with the stage on its own HDMI.
+	Box          bool    // PC_BOX=1
+	BoxAutoParty bool    // PC_BOX_AUTOPARTY=1: create a party at boot when none is open
+	BoxName      string  // PC_BOX_NAME
+	BoxAudio     bool    // PC_BOX_AUDIO=1: the stage listens to a microphone (?audio=1)
+	MaxLive      int     // PC_MAX_LIVE: live streams on the wall (9; a Pi 5 decodes 4)
+	StageScale   float64 // PC_STAGE_SCALE: default shader resolution (0.6; Pi 0.5)
+
 	// GlyphsDir is HandWrittenStickers' assets/glyphs (sheets.json + one dir per
 	// sheet). Empty = sticker notes in the Caveat font (D16).
 	GlyphsDir string // PC_GLYPHS_DIR
@@ -101,6 +109,12 @@ func Load() Config {
 		TranslatorURL:            strings.TrimRight(env("TRANSLATOR_URL", ""), "/"),
 		TranslatorToken:          env("TRANSLATOR_TOKEN", ""),
 		GlyphsDir:                env("PC_GLYPHS_DIR", ""),
+		Box:                      env("PC_BOX", "") == "1",
+		BoxAutoParty:             env("PC_BOX_AUTOPARTY", "") == "1",
+		BoxName:                  env("PC_BOX_NAME", "Party"),
+		BoxAudio:                 env("PC_BOX_AUDIO", "") == "1",
+		MaxLive:                  min(num("PC_MAX_LIVE", 9), 9),
+		StageScale:               flt("PC_STAGE_SCALE", 0.6),
 		Moderation:               env("MODERATION", "none"),
 		AutoApproveMax:           flt("SFW_AUTO_APPROVE_MAX", 0.15),
 	}

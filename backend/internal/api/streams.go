@@ -19,6 +19,7 @@ package api
 // pending ones.
 
 import (
+	"fmt"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -31,7 +32,7 @@ import (
 )
 
 const (
-	maxLiveStreams  = 9                // 3×3 wall; every viewer decodes each one
+	maxLiveStreams  = 9                // 3×3 wall; every viewer decodes each one (PC_MAX_LIVE lowers it)
 	maxStreams      = 24               // pending + live per party
 	streamConnectIn = 90 * time.Second // a new stream must connect its socket by then
 	streamGrace     = 20 * time.Second // a dropped phone may reconnect within this
@@ -190,8 +191,8 @@ func (s *Server) streamStatus(status string) partyHandler {
 			writeErr(w, 404, "stream nenalezen")
 			return
 		}
-		if status == "live" && st.Status != "live" && len(s.streamList(p.Code, true)) >= maxLiveStreams {
-			writeErr(w, 409, "na plátně je už 9 streamů")
+		if status == "live" && st.Status != "live" && len(s.streamList(p.Code, true)) >= s.maxLive() {
+			writeErr(w, 409, fmt.Sprintf("na plátně je už %d streamů", s.maxLive()))
 			return
 		}
 		st.Status = status

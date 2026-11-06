@@ -4,8 +4,9 @@
   import Cockpit from './cockpit/Cockpit.svelte';
   import Guest from './guest/Guest.svelte';
   import Recap from './recap/Recap.svelte';
+  import Box from './Box.svelte';
 
-  // /stage/<code>  /cockpit/<code>  /join/<code>  /recap/<code>  /
+  // /stage/<code>  /cockpit/<code>  /join/<code>  /recap/<code>  /box  /
   const [, section = '', raw = ''] = location.pathname.split('/');
   const code = raw.toUpperCase();
 </script>
@@ -18,6 +19,8 @@
   <Guest {code} />
 {:else if section === 'recap' && code}
   <Recap {code} />
+{:else if section === 'box'}
+  <Box />
 {:else}
   <Home />
 {/if}

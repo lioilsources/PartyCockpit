@@ -13,6 +13,8 @@ export type Party = {
   scene: Scene;
   clients: Record<string, number>;
   iceServers: RTCIceServer[];
+  /** Party box defaults (D20); absent elsewhere. */
+  box?: { scale: number };
   autoLive: boolean;
 };
 

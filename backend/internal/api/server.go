@@ -39,7 +39,8 @@ type Server struct {
 	Subtitles  *subtitles.Client // nil = typed subtitles only
 	Glyphs     *glyphs.Set       // nil = notes in a font
 	Classifier providers.Classifier
-	Web        fs.FS // built frontend (may be empty in dev)
+	Web        fs.FS  // built frontend (may be empty in dev)
+	Version    string // build version, shown on the box screen
 
 	jobs  chan jobTask
 	anims chan animTask
@@ -60,6 +61,9 @@ type Server struct {
 
 	tickets tickets // single-use cockpit socket tickets
 
+	pmu       sync.Mutex
+	pairUntil map[string]time.Time // party → the box shows the pairing QR until (D20)
+
 	gmu   sync.Mutex
 	draws map[string][]string // party → guest ids of the last lottery draw
 	games map[string]*game    // party → the intermission game in progress
@@ -78,6 +82,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.streams = map[string]map[string]*Stream{}
 	s.mics = map[string]*mic{}
 	s.tickets.m = map[string]ticket{}
+	s.pairUntil = map[string]time.Time{}
 	s.limits = newLimiter(func() time.Time { return s.Store.Now() }, writeRate, writeBurst)
 	s.gameInputs = newLimiter(time.Now, 30, 30)
 	s.draws, s.games = map[string][]string{}, map[string]*game{}
@@ -107,6 +112,7 @@ func (s *Server) Init(ctx context.Context) error {
 		go s.animWorker()
 	}
 	go s.janitor()
+	s.boxStart(ctx)
 	return nil
 }
 
@@ -188,6 +194,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/webtoon", s.listWebtoon)
 	mux.HandleFunc("GET /webtoon/{ep}/{file}", s.serveWebtoon)
 
+	mux.HandleFunc("GET /box", s.box)
+	mux.HandleFunc("GET /api/box", s.boxInfo)
+	mux.HandleFunc("POST /api/parties/{code}/pair", s.cockpit(s.pair))
 	mux.HandleFunc("GET /ws/parties/{code}", s.ws)
 	mux.HandleFunc("GET /", s.spa)
 	return securityHeaders(logRequests(mux))
@@ -288,12 +297,19 @@ func (s *Server) admin(h http.HandlerFunc) http.HandlerFunc {
 			writeErr(w, 401, "seznam party jen s admin tokenem (PC_ADMIN_TOKEN)")
 			return
 		}
-		if s.Cfg.AdminToken != "" && !eq(r.Header.Get("X-Admin-Token"), s.Cfg.AdminToken) {
+		// a fresh box (no open party) lets the organiser's phone create the first one
+		firstOnBox := r.Method == "POST" && s.Cfg.Box && !s.hasOpenParty(r)
+		if s.Cfg.AdminToken != "" && !firstOnBox && !eq(r.Header.Get("X-Admin-Token"), s.Cfg.AdminToken) {
 			writeErr(w, 401, "neplatný admin token")
 			return
 		}
 		h(w, r)
 	}
+}
+
+func (s *Server) hasOpenParty(r *http.Request) bool {
+	_, ok := s.openParty(r.Context())
+	return ok
 }
 
 func logRequests(next http.Handler) http.Handler {
@@ -387,6 +403,12 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 	hello = append(hello, hub.Msg{Type: "hello", Data: map[string]string{"peer": peer.ID}})
 	hello = append(hello, s.streamHello(p.Code, peer)...)
 	hello = append(hello, s.gameHello(p.Code, peer)...)
+	if s.Cfg.Box && isBoxStage(peer) {
+		hello = append(hello, s.pairingMsg(r.Context(), p.Code))
+	}
+	if role == hub.Cockpit {
+		s.endPairing(r.Context(), p.Code)
+	}
 	s.Hub.Serve(context.WithoutCancel(r.Context()), conn, p.Code, peer, hello, hub.Handlers{OnMsg: s.onMsg, OnLeave: s.onLeave})
 }
 
