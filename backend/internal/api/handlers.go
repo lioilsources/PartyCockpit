@@ -477,12 +477,22 @@ func (s *Server) cockpitPayload(ctx context.Context, p store.Party) (cockpitStat
 	}
 	st.Jobs, _ = s.Store.JobStats(ctx)
 	st.Clients = s.Hub.Counts(p.Code)
+	// Go's nil slices encode as null; clients type these as arrays (found by the React Cockpit, D21)
+	st.Assets, st.Guests, st.Ideas, st.Jobs = orEmpty(st.Assets), orEmpty(st.Guests), orEmpty(st.Ideas), orEmpty(st.Jobs)
 	st.Config = map[string]any{
 		"restyle": s.Restyler.Name(), "animate": s.Animator.Name(), "moderation": s.Cfg.Moderation,
 		"autoApproveMax": s.Cfg.AutoApproveMax, "djfyUrl": s.Cfg.DJfyURL, "subtitles": s.Subtitles != nil,
 		"stageKey": p.StageKey, "fileKey": fileKey(p),
 	}
 	return st, nil
+}
+
+// orEmpty makes a nil slice encode as [] instead of null.
+func orEmpty[T any](v []T) []T {
+	if v == nil {
+		return []T{}
+	}
+	return v
 }
 
 func (s *Server) cockpitState(w http.ResponseWriter, r *http.Request, p store.Party) {

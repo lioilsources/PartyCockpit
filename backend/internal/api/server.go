@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -198,6 +199,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/box", s.boxInfo)
 	mux.HandleFunc("POST /api/parties/{code}/pair", s.cockpit(s.pair))
 	mux.HandleFunc("GET /ws/parties/{code}", s.ws)
+	mux.HandleFunc("GET /cockpit/{code}", s.cockpitPage)
 	mux.HandleFunc("GET /", s.spa)
 	return securityHeaders(logRequests(mux))
 }
@@ -453,7 +455,7 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 			st, _ := f.Stat()
 			f.Close()
 			if st != nil && !st.IsDir() {
-				if strings.HasPrefix(name, "assets/") {
+				if strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, "react/assets/") {
 					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 				}
 				http.ServeFileFS(w, r, s.Web, name)
@@ -461,8 +463,28 @@ func (s *Server) spa(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	index := "index.html"
+	if strings.HasPrefix(r.URL.Path, "/react/") {
+		// the React Cockpit (D21) is its own SPA under /react/
+		index = "react/index.html"
+		if _, err := fs.Stat(s.Web, index); err != nil {
+			http.Error(w, "react UI not built (make web)", http.StatusNotFound)
+			return
+		}
+	}
 	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFileFS(w, r, s.Web, "index.html")
+	http.ServeFileFS(w, r, s.Web, index)
+}
+
+// cockpitPage: /cockpit/<code> is the Svelte Cockpit unless PC_COCKPIT_UI=react
+// (D21). The browser keeps the #token= fragment across the redirect, so the
+// box's pairing QR and links from Home work with either UI.
+func (s *Server) cockpitPage(w http.ResponseWriter, r *http.Request) {
+	if s.Cfg.CockpitUI == "react" {
+		http.Redirect(w, r, "/react/cockpit/"+url.PathEscape(r.PathValue("code")), http.StatusFound)
+		return
+	}
+	s.spa(w, r)
 }
 
 func (s *Server) partyDir(code string) string { return filepath.Join(s.Cfg.DataDir, "party", code) }

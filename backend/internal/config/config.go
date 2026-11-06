@@ -69,6 +69,10 @@ type Config struct {
 	MaxLive      int     // PC_MAX_LIVE: live streams on the wall (9; a Pi 5 decodes 4)
 	StageScale   float64 // PC_STAGE_SCALE: default shader resolution (0.6; Pi 0.5)
 
+	// CockpitUI picks the operator UI behind /cockpit/<code> (D21): "svelte" or
+	// "react". Both are embedded; /react/cockpit/<code> always serves React.
+	CockpitUI string // PC_COCKPIT_UI
+
 	// GlyphsDir is HandWrittenStickers' assets/glyphs (sheets.json + one dir per
 	// sheet). Empty = sticker notes in the Caveat font (D16).
 	GlyphsDir string // PC_GLYPHS_DIR
@@ -109,6 +113,7 @@ func Load() Config {
 		TranslatorURL:            strings.TrimRight(env("TRANSLATOR_URL", ""), "/"),
 		TranslatorToken:          env("TRANSLATOR_TOKEN", ""),
 		GlyphsDir:                env("PC_GLYPHS_DIR", ""),
+		CockpitUI:                cockpitUI(env("PC_COCKPIT_UI", "svelte")),
 		Box:                      env("PC_BOX", "") == "1",
 		BoxAutoParty:             env("PC_BOX_AUTOPARTY", "") == "1",
 		BoxName:                  env("PC_BOX_NAME", "Party"),
@@ -118,6 +123,14 @@ func Load() Config {
 		Moderation:               env("MODERATION", "none"),
 		AutoApproveMax:           flt("SFW_AUTO_APPROVE_MAX", 0.15),
 	}
+}
+
+// cockpitUI accepts "react"; anything else is the default Svelte Cockpit.
+func cockpitUI(v string) string {
+	if strings.EqualFold(strings.TrimSpace(v), "react") {
+		return "react"
+	}
+	return "svelte"
 }
 
 func env(k, def string) string {
