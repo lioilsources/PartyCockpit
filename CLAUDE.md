@@ -8,8 +8,8 @@ Party show na plátno: Stage (TV), Cockpit (operátor), Guest (telefon přes QR)
 ```sh
 make build      # npm build → embed do backend/internal/web/dist → bin/partycockpit
 make run        # s .env
-make dev        # backend :8098 + vite :5173 (proxy /api /ws /files /webtoon /stylemaps /glyphs)
-make check      # go vet + go test + shellcheck + svelte-check + vite build — brána před pushem
+make dev        # backend :8098 + vite :5173 (Svelte) a :5174/react/ (React Cockpit), proxy na backend
+make check      # go test + shellcheck + svelte-check + tsc/eslint/vitest Reactu + oba buildy — brána
 make dist       # party box: dist/partycockpit-linux-{arm64,amd64}.tar.gz
 make styles     # přegeneruje katalog stylů z ../Restyler
 ```
@@ -27,6 +27,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `backend/internal/api/recap.go`, `preflight.go` — M7: recap + zip, kontroly „Před party“
 - `backend/internal/subtitles` + `api/subtitles.go` — titulky přes Translator; `frontend/src/lib/mic.ts` VAD
 - `backend/internal/api/box.go`, `deploy/box/` — party box (Pi): /box, párování, systemd, runbook
+- `frontend-react/` — druhý Cockpit v React 19 + TS (D21), `/react/cockpit/<kód>`; sdílí `frontend/src/lib` přes `@pc`
 - `backend/internal/glyphs` + `frontend/src/lib/handwriting.ts` — ručně psané vzkazy; `api/game.go` + `stage/scenes/Kruh.svelte` hra
 - `backend/internal/djfy` — klient DJfy relay (SSE + guest zprávy)
 - `backend/internal/gallery` — FineTuneGallery list + disková cache obrázků
@@ -52,6 +53,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - Stage musí přežít výpadek backendu: cache stavu v localStorage, scény jedou dál.
 
 ## Odchylky od plánu
+Odchylka od node.md: Svelte + Vite bez SvelteKitu a druhý Cockpit v Reactu (D21).
 SQLite místo Postgres (přenosný party box), port 8098, restyle přes Restyler backend,
 stickery fontem místo HandWrittenStickers, streamy P2P bez LiveKit, animace přímo přes ComfyUI. Detail v `DECISIONS.md` D2, D11–D13.
 

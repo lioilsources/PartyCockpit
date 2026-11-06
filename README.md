@@ -62,6 +62,26 @@ K TV nebo projektoru stačí Raspberry Pi 5 (nebo mini PC) s PartyCockpitem
 a plátnem v kiosku; Cockpit i hosté jsou v telefonech. Balíček: `make dist`,
 instalace, https a router: [`deploy/box/README.md`](deploy/box/README.md).
 
+## Cockpit v Reactu
+
+Cockpit má dvě nezávislé implementace nad stejným API a WebSocketem: Svelte
+(`frontend/`, výchozí) a React 19 + TypeScript (`frontend-react/`). Obě jsou
+v binárce. React běží na `/react/cockpit/<kód>`, na úvodní stránce je tlačítko
+„Cockpit (React)“. `PC_COCKPIT_UI=react` přesměruje i `/cockpit/<kód>`
+(párovací QR z boxu, odkazy z Home) na React. Sdílí se jen transport a typy
+z `frontend/src/lib` (alias `@pc`) a klíče v localStorage, takže přepnutí
+UI zachová přihlášení i nastavení.
+
+```sh
+cd frontend-react
+npm run dev     # :5174/react/cockpit/<kód>, proxy na backend :8098
+npm run check   # tsc + ESLint (strict type-checked, react-hooks) + Vitest
+```
+
+Stav je `useReducer` nad zprávami ze socketu (`src/state`), WebRTC a mikrofon
+jsou sdílené třídy zabalené přes `useSyncExternalStore` (`src/hooks`).
+Rozhodnutí: `DECISIONS.md` D21.
+
 ## Kiosk
 
 ```sh

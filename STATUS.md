@@ -117,6 +117,22 @@ fotky, Cockpit náhledy čekajících, mikrofon s ticketem, CSP v konzoli bez hl
 od bodu 1: kiosk pod `cage` na tty1, výkon scén a 4 streamů, teplota, `lego`
 s Cloudflare, router s vlastním DNS záznamem.
 
+## 2026-11-06: Cockpit v Reactu (D21)
+
+| Část | Stav |
+|---|---|
+| `frontend-react/`: React 19 + TS, parita všech 12 sekcí Svelte Cockpitu | ✅ |
+| backend: `/react/` z binárky, `PC_COCKPIT_UI`, prázdné seznamy jako `[]` | ✅ testy |
+| tsc strict, ESLint strict type-checked + react-hooks, Vitest (reducer, helpery, přihlášení → socket → schválení, rotace tokenu) | ✅ v `make check` |
+
+Ověřeno v Chrome: Svelte a React Cockpit nad jednou party s plátnem a hostem.
+Vzkaz schválený v Reactu zmizel v obou a objevil se na plátně, scéna přepnutá
+ze Svelte se ukázala v Reactu. Po vypnutí backendu React ukázal offline a po
+návratu se sám připojil se stejným stavem. S `PC_COCKPIT_UI=react` vedl odkaz
+`/cockpit/<kód>#token=…` do Reactu, ten se přihlásil a token z adresy smazal.
+Konzole bez chyb. Neověřeno: náhledy živých streamů a mikrofon v Reactu
+(potřebují kameru a https), React varování v dev buildu jen přes testy.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).

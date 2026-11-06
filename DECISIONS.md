@@ -266,3 +266,33 @@ Zadání a posouzení: `Prompts/02-PARTY-BOX-PI.md`, runbook `deploy/box/README.
   a amd64 s vloženým frontendem).
 - Neověřeno na skutečném Pi: kiosk pod `cage`, výkon, teplota, `lego`. Ověřeno
   na Macu: box mode v prohlížeči, testy, `shellcheck` skriptů, cross-compile.
+
+## D21: Cockpit podruhé, v Reactu (2026-11-06)
+Zadání: `Prompts/03-COCKPIT-REACT.md`.
+- Druhá implementace Cockpitu v React 19 + TypeScript v `frontend-react/`,
+  vedle Svelte. Důvod: portfolio pro pozici s požadavkem na React a TS;
+  vedlejší efekt je druhý klient nad stejným protokolem.
+- Sdílí se jen transport a typy (`frontend/src/lib/*.ts` přes alias `@pc`)
+  a klíče v localStorage. UI a stav jsou nezávislé: `useReducer` nad zprávami
+  ze socketu, hooky, kontext, CSS Modules; žádné knihovny na stav ani UI.
+  Sdílené třídy s vlastním životem (WebRTC `Viewer`, `Mic`) se vytváří
+  v efektech a čtou přes `useSyncExternalStore`.
+- Obě UI vložená v binárce: `/cockpit/<kód>` Svelte, `/react/cockpit/<kód>`
+  React; `PC_COCKPIT_UI=react` přesměruje první na druhé. Fragment
+  `#token=` přežije 302, takže párovací QR z boxu funguje s oběma.
+- Odchylka od pravidla „web je Astro nebo SvelteKit“: vědomá, jen pro Cockpit.
+  Vite 8 místo 7 (plugin pro React 19 jiný nepodporuje), TypeScript 6.0 jako
+  ve `frontend/` (typescript-eslint vyšší nepodporuje).
+- `confirm()` u výměny tokenu nahrazuje dvoukrokové tlačítko (modální dialog
+  blokuje kiosk i automatizaci prohlížeče).
+- **Co druhý klient odhalil o protokolu:**
+  - Server posílal prázdné seznamy ve stavu Cockpitu jako `null` (Go nil
+    slice), typy tvrdí pole. Na party bez hostů padal i Svelte Cockpit
+    (hlavička se nevykreslila celá). Opraveno na serveru (`orEmpty`, test);
+    React navíc čte zprávu jako `Wire<T>`, kde seznam smí být `null`.
+  - Cockpit nezná limit živých streamů na plátně (`PC_MAX_LIVE`, na Pi 4):
+    oba ukazují „/9“. Nechané kvůli paritě; stačilo by poslat `maxLive`
+    v `config`.
+  - „Konec hry“ přepíná na mezihru s počtem dob ze scénového panelu; React
+    posílá výchozích 8, protože panel scén drží svůj stav sám.
+
