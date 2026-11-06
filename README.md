@@ -56,6 +56,12 @@ Docker: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --bui
 
 Hosty za Cloudflare Access ověřuje `CF_ACCESS_CLIENT_ID/SECRET`.
 
+## Party box (Raspberry Pi)
+
+K TV nebo projektoru stačí Raspberry Pi 5 (nebo mini PC) s PartyCockpitem
+a plátnem v kiosku; Cockpit i hosté jsou v telefonech. Balíček: `make dist`,
+instalace, https a router: [`deploy/box/README.md`](deploy/box/README.md).
+
 ## Kiosk
 
 ```sh

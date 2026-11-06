@@ -104,6 +104,19 @@ naráz (latence na Wi-Fi), konec hry s vyhlášením vítěze.
 Projít: Cockpit → „Otevřít plátno“ (klíč zmizí z URL), host vidí svoje čekající
 fotky, Cockpit náhledy čekajících, mikrofon s ticketem, CSP v konzoli bez hlášek.
 
+## 2026-11-06: Party box (D20)
+
+| Část | Stav |
+|---|---|
+| `make dist` (linux arm64/amd64), `deploy/box` instalátor, systemd, certifikát, update | ✅ cross-compile, `shellcheck` |
+| box mode: `/box`, automatická party, párovací QR, LAN adresa v QR, limity Pi | ✅ testy + Chrome na Macu |
+| sd_notify a watchdog, kontroly certifikátu a teploty | ✅ testy |
+| runbook `deploy/box/README.md` | ✅ |
+
+**Neověřeno:** nic z toho neběželo na Raspberry Pi. Na Pi projít runbook
+od bodu 1: kiosk pod `cage` na tty1, výkon scén a 4 streamů, teplota, `lego`
+s Cloudflare, router s vlastním DNS záznamem.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
@@ -111,4 +124,5 @@ fotky, Cockpit náhledy čekajících, mikrofon s ticketem, CSP v konzoli bez hl
 4. M4 dokončit: domluvit v L40S session okno s ComfyUI (profil D) a ověřit
    `ANIMATE_PROVIDER=comfy` celou cestou (telefon → Cockpit → plátno). Prověřit licenci
    vah LivePortrait pro B2B.
-5. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.
+5. Party box: projít `deploy/box/README.md` na skutečném Raspberry Pi 5.
+6. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.

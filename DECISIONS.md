@@ -238,3 +238,31 @@ které znají kód z plátna.
   bidi), stejná přezdívka → 409 s návrhem („Ema 2“), cockpit token jde vyměnit.
 - Nechává se: `/metrics` a `/healthz` veřejné (jen agregáty), plain http v domácí
   LAN (preflight varuje). Pro B2B: `PC_TLS_*` a `PC_ADMIN_TOKEN` povinně.
+
+## D20: Party box na Raspberry Pi (2026-11-06)
+Zadání a posouzení: `Prompts/02-PARTY-BOX-PI.md`, runbook `deploy/box/README.md`.
+- K TV jde jen box (Raspberry Pi 5 8 GB nebo mini PC N100): backend i plátno
+  v kiosku (Chromium pod `cage` na tty1, systemd). Ovládání jen z telefonů.
+- **Utáhne to Pi 5 s limity**: 2D scény, shadery a backend ano; Pi nemá
+  hardwarový dekodér H.264, proto nejvýš 4 živé streamy (`PC_MAX_LIVE`) a klipy
+  jen v 480×832. Výstup 1080p, shadery na 0,5 rozlišení (`PC_STAGE_SCALE`).
+  Mini PC N100 nemá tyhle limity, stejný balíček (amd64) a stejný runbook.
+- **Bez klávesnice**: `/box` vydá klíč plátna jen loopbacku (kiosku na boxu)
+  a pošle ho na plátno otevřené party; jinak ukáže obrazovku boxu (adresa pro
+  telefony, IP, certifikát). První party na boxu jde založit bez admin tokenu.
+- **Párování**: s `PC_BOX_AUTOPARTY` box party založí sám a plátno na boxu
+  ukáže QR s odkazem do Cockpitu (token v `#`). QR zmizí, když se Cockpit
+  připojí, nebo za 10 min; Cockpit ho může ukázat znovu. Token je na plátně
+  jen v této chvíli přípravy, kdy je v sále pořadatel; vědomý kompromis proti
+  psaní tokenu na TV.
+- Bez `PC_PUBLIC_URL` vede QR pro hosty na LAN adresu boxu (kiosk sám mluví
+  na 127.0.0.1, což by telefonům nebylo k ničemu).
+- **https přes DNS-01**: veřejný DNS záznam vlastní domény na LAN IP boxu,
+  certifikát Let's Encrypt přes `lego` a Cloudflare API, obnova týdně doma.
+  Router má stejný záznam pro místa bez internetu. Telefony hostů nic
+  neinstalují.
+- Backend hlásí systemd připravenost a krmí watchdog, dokud odpovídá DB
+  (`internal/sdnotify`, bez závislosti). Release: `make dist` (static arm64
+  a amd64 s vloženým frontendem).
+- Neověřeno na skutečném Pi: kiosk pod `cage`, výkon, teplota, `lego`. Ověřeno
+  na Macu: box mode v prohlížeči, testy, `shellcheck` skriptů, cross-compile.
