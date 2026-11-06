@@ -38,7 +38,7 @@ shellcheck:
 	@if command -v shellcheck >/dev/null; then shellcheck deploy/box/*.sh && echo "shellcheck ok"; \
 	else echo "shellcheck not installed, skipping deploy/box checks"; fi
 
-# Release tarballs for the party box (D20): dist/partycockpit-linux-{arm64,amd64}.tar.gz
+# Release packages: party box (D20) dist/partycockpit-linux-{arm64,amd64}.tar.gz, laptop dist/partycockpit-windows-amd64.zip
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 ARCHES := arm64 amd64
 dist: web
@@ -50,12 +50,22 @@ dist: web
 			-ldflags "-s -w -X main.version=$(VERSION)" -o ../$$pkg/bin/partycockpit ./cmd/partycockpit) || exit 1; \
 		cp -R assets/drivers $$pkg/assets/; \
 		cp -R deploy/box $$pkg/deploy/; \
-		cp .env.example $$pkg/; \
+		cp .env.example deploy/laptop/README.txt $$pkg/; \
 		echo $(VERSION) > $$pkg/VERSION; \
 		COPYFILE_DISABLE=1 tar --no-xattrs -czf dist/partycockpit-linux-$$arch.tar.gz -C dist partycockpit-$(VERSION)-linux-$$arch; \
 		rm -rf $$pkg; \
 		echo "dist/partycockpit-linux-$$arch.tar.gz ($(VERSION))"; \
 	done
+	@pkg=dist/partycockpit-$(VERSION)-windows-amd64; \
+	mkdir -p $$pkg/assets && \
+	(cd backend && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
+		-ldflags "-s -w -X main.version=$(VERSION)" -o ../$$pkg/partycockpit.exe ./cmd/partycockpit) && \
+	cp -R assets/drivers $$pkg/assets/ && \
+	cp .env.example $$pkg/env.example && \
+	cp deploy/laptop/README.txt $$pkg/ && \
+	echo $(VERSION) > $$pkg/VERSION && \
+	(cd dist && rm -f partycockpit-windows-amd64.zip && COPYFILE_DISABLE=1 zip -qrX partycockpit-windows-amd64.zip partycockpit-$(VERSION)-windows-amd64) && \
+	rm -rf $$pkg && echo "dist/partycockpit-windows-amd64.zip ($(VERSION))"
 
 # Regenerate the style catalog from a Restyler checkout (RESTYLER_DIR=../Restyler)
 styles:

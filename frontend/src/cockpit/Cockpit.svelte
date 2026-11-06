@@ -393,9 +393,7 @@
         <div>
           <h3>Ručně</h3>
           <p class="muted small">Token unikl (fotka tabletu)? <button onclick={rotateToken}>Vyměnit cockpit token</button></p>
-          {#if party.box}
-            <p class="muted small">Druhý operátor? <button onclick={() => act(() => api.post(p('/pair'), {}, token))}>Párovací QR na plátno</button> (10 min)</p>
-          {/if}
+          <p class="muted small">Cockpit do telefonu? <button onclick={() => act(() => api.post(p('/pair'), {}, token))}>Párovací QR na plátno</button> (10 min)</p>
           <ul>
             {#each manual as m (m.id)}
               <li><label><input type="checkbox" checked={!!done[m.id]} onchange={() => toggle(m.id)} /> {m.label}</label></li>

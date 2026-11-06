@@ -36,6 +36,14 @@ type fakeComfy struct {
 	uploads  []string
 	workflow map[string]any
 	polls    int
+	out      string // output file name; default a LivePortrait mp4
+}
+
+func (f *fakeComfy) output() string {
+	if f.out != "" {
+		return f.out
+	}
+	return "party_live_00001.mp4"
 }
 
 func (f *fakeComfy) handler() http.Handler {
@@ -72,14 +80,15 @@ func (f *fakeComfy) handler() http.Handler {
 			return
 		}
 		w.Write([]byte(`{"p1":{"status":{"status_str":"success","completed":true},
-			"outputs":{"8":{"gifs":[{"filename":"partycockpit_live_00001.mp4","subfolder":"","type":"output"}]}}}}`))
+			"outputs":{"6":{"images":[{"filename":"preview.png","subfolder":"","type":"temp"}]},
+			"8":{"gifs":[{"filename":"` + f.output() + `","subfolder":"","type":"output"}]}}}}`))
 	})
 	mux.HandleFunc("GET /view", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("filename") != "partycockpit_live_00001.mp4" || r.URL.Query().Get("type") != "output" {
+		if r.URL.Query().Get("filename") != f.output() || r.URL.Query().Get("type") != "output" {
 			http.Error(w, "bad view", 400)
 			return
 		}
-		w.Write([]byte("MP4DATA"))
+		w.Write([]byte("OUTDATA"))
 	})
 	return mux
 }
@@ -98,7 +107,7 @@ func TestComfyLivePortrait(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(clip) != "MP4DATA" || ext != "mp4" || id != "p1" {
+		if string(clip) != "OUTDATA" || ext != "mp4" || id != "p1" {
 			t.Fatalf("got %q %q %q", clip, ext, id)
 		}
 		f.polls = 0
@@ -106,7 +115,7 @@ func TestComfyLivePortrait(t *testing.T) {
 	// driver uploaded once, photo every time
 	drivers := 0
 	for _, u := range f.uploads {
-		if u == "pc_driver_alive.mp4" {
+		if u == "party_driver_alive.mp4" {
 			drivers++
 		}
 	}
@@ -117,8 +126,49 @@ func TestComfyLivePortrait(t *testing.T) {
 	if strings.Contains(string(raw), "__") {
 		t.Fatalf("placeholder left in workflow: %s", raw)
 	}
-	if !strings.Contains(string(raw), `"pc_driver_alive.mp4"`) {
+	if !strings.Contains(string(raw), `"party_driver_alive.mp4"`) {
 		t.Fatal("driver not in workflow")
+	}
+}
+
+func TestComfyRestyle(t *testing.T) {
+	f := &fakeComfy{out: "party_restyle_00001_.png"}
+	ts := httptest.NewServer(f.handler())
+	defer ts.Close()
+	c := &Comfy{URL: ts.URL, Poll: time.Millisecond}
+	out, id, err := c.Restyle(context.Background(), RestyleRequest{Photo: pngBytes(), Prompt: "a Vermeer portrait"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != "OUTDATA" || id != "p1" {
+		t.Fatalf("got %q %q", out, id)
+	}
+	if len(f.uploads) != 1 || !strings.HasPrefix(f.uploads[0], "party_") {
+		t.Fatalf("uploads %v (cleanup on the GPU host needs the party_ prefix)", f.uploads)
+	}
+	raw, _ := json.Marshal(f.workflow)
+	if strings.Contains(string(raw), `"__`) {
+		t.Fatalf("placeholder left: %s", raw)
+	}
+	// 40×60 photo → the 2:3 portrait bucket, in the resize and the latent
+	for _, node := range []string{"5", "16"} {
+		in := f.workflow[node].(map[string]any)["inputs"].(map[string]any)
+		if in["width"] != 832.0 || in["height"] != 1216.0 {
+			t.Fatalf("node %s size %v×%v", node, in["width"], in["height"])
+		}
+	}
+	if p := f.workflow["8"].(map[string]any)["inputs"].(map[string]any)["text"]; p != "a Vermeer portrait" {
+		t.Fatalf("prompt %v", p)
+	}
+}
+
+func TestSDXLBucket(t *testing.T) {
+	for _, c := range []struct{ w, h, bw, bh int }{
+		{3024, 4032, 896, 1152}, {4032, 3024, 1152, 896}, {1080, 1920, 768, 1344}, {1000, 1000, 1024, 1024}, {0, 0, 832, 1216},
+	} {
+		if w, h := sdxlBucket(c.w, c.h); w != c.bw || h != c.bh {
+			t.Errorf("%d×%d → %d×%d, want %d×%d", c.w, c.h, w, h, c.bw, c.bh)
+		}
 	}
 }
 

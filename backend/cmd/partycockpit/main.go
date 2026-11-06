@@ -43,6 +43,12 @@ func main() {
 }
 
 func run() error {
+	// the release binary on a laptop: .env next to where it is started
+	if n, err := config.LoadDotEnv(".env"); err != nil {
+		slog.Warn(".env not read", "err", err)
+	} else if n > 0 {
+		slog.Info("loaded .env", "vars", n)
+	}
 	cfg := config.Load()
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		return err
@@ -61,8 +67,17 @@ func run() error {
 	aistack := cf
 	aistack.Extra = map[string]string{"X-Project": cfg.AiStackProject}
 
+	comfyAuth := providers.Auth{}
+	if cfg.ComfyToken != "" {
+		comfyAuth.Extra = map[string]string{"Authorization": "Bearer " + cfg.ComfyToken}
+	}
+	// one client: restyles and animations share ComfyUI's queue (and its upload cache)
+	comfy := &providers.Comfy{URL: cfg.ComfyURL, Auth: comfyAuth, DriverDir: cfg.DriverDir}
+
 	var restyler providers.Restyler
 	switch cfg.RestyleProvider {
+	case "comfy":
+		restyler = comfy
 	case "restyler":
 		a := cf
 		a.Extra = map[string]string{"Authorization": "app " + cfg.RestylerToken, "X-User": cfg.RestylerUser}
@@ -85,7 +100,7 @@ func run() error {
 	var animator providers.Animator
 	switch cfg.AnimateProvider {
 	case "comfy":
-		animator = &providers.Comfy{URL: cfg.ComfyURL, DriverDir: cfg.DriverDir}
+		animator = comfy
 	case "restyler":
 		a := cf
 		a.Extra = map[string]string{"Authorization": "app " + cfg.RestylerToken, "X-User": cfg.RestylerUser}
@@ -140,6 +155,12 @@ func run() error {
 	ln, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return err
+	}
+	if !cfg.Box {
+		fmt.Fprintf(os.Stderr, "\nPartyCockpit běží: otevři %s\n", srv.StartURL())
+		if cfg.PublicURL == "" {
+			fmt.Fprintf(os.Stderr, "Telefony: %s (QR na plátně tam vede)\n\n", srv.LANURL())
+		}
 	}
 	// under systemd (party box): ready once we listen, watchdog while the DB answers
 	sdnotify.Notify("READY=1")

@@ -405,7 +405,7 @@ func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
 	hello = append(hello, hub.Msg{Type: "hello", Data: map[string]string{"peer": peer.ID}})
 	hello = append(hello, s.streamHello(p.Code, peer)...)
 	hello = append(hello, s.gameHello(p.Code, peer)...)
-	if s.Cfg.Box && isBoxStage(peer) {
+	if isBoxStage(peer) { // the stage on this machine (box or laptop)
 		hello = append(hello, s.pairingMsg(r.Context(), p.Code))
 	}
 	if role == hub.Cockpit {

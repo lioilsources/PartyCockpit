@@ -94,7 +94,7 @@ var ErrUnsupportedMotion = errors.New("provider does not support this motion")
 var workflowFS embed.FS
 
 // Comfy talks to a ComfyUI host directly. Driver clips for LivePortrait are
-// expected in the host's input folder as pc_driver_<motion>.mp4; with DriverDir
+// expected in the host's input folder as party_driver_<motion>.mp4; with DriverDir
 // set they are uploaded from there on first use.
 type Comfy struct {
 	URL       string
@@ -109,7 +109,7 @@ type Comfy struct {
 func (c *Comfy) Name() string { return "comfy" }
 
 func (c *Comfy) Animate(ctx context.Context, req AnimateRequest) ([]byte, string, string, error) {
-	img, err := c.upload(ctx, "pc_"+randID()+".png", req.Image)
+	img, err := c.upload(ctx, "party_"+randID()+".png", req.Image)
 	if err != nil {
 		return nil, "", "", fmt.Errorf("upload photo: %w", err)
 	}
@@ -127,12 +127,62 @@ func (c *Comfy) Animate(ctx context.Context, req AnimateRequest) ([]byte, string
 	if err != nil {
 		return nil, "", "", err
 	}
+	f, out, id, err := c.run(ctx, wf, isVideoFile)
+	if err != nil {
+		return nil, "", id, err
+	}
+	return out, strings.TrimPrefix(filepath.Ext(f.Filename), "."), id, nil
+}
+
+// Restyle runs Restyler's restyle_flux graph (FLUX dev + PuLID keeps the face,
+// depth ControlNet keeps the pose) straight on ComfyUI: workflows/flux_restyle.json.
+func (c *Comfy) Restyle(ctx context.Context, req RestyleRequest) ([]byte, string, error) {
+	img, err := c.upload(ctx, "party_"+randID()+".jpg", req.Photo)
+	if err != nil {
+		return nil, "", fmt.Errorf("upload photo: %w", err)
+	}
+	w, h := 832, 1216
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(req.Photo)); err == nil {
+		w, h = sdxlBucket(cfg.Width, cfg.Height)
+	}
+	wf, err := loadWorkflow("workflows/flux_restyle.json", map[string]any{
+		"__IMAGE__": img, "__PROMPT__": req.Prompt, "__SEED__": seed(), "__W__": w, "__H__": h,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	_, out, id, err := c.run(ctx, wf, isImageFile)
+	return out, id, err
+}
+
+// sdxlBuckets: the ~1 MP sizes Restyler renders in (tgbot/imagesize.py), so
+// the depth hint and the face are not cropped off a landscape photo.
+var sdxlBuckets = [][2]int{{1024, 1024}, {896, 1152}, {1152, 896}, {832, 1216}, {1216, 832}, {768, 1344}, {1344, 768}}
+
+// sdxlBucket picks the bucket whose aspect ratio is closest to w×h.
+func sdxlBucket(w, h int) (int, int) {
+	best, bestD := sdxlBuckets[3], math.Inf(1)
+	if w <= 0 || h <= 0 {
+		return best[0], best[1]
+	}
+	r := math.Log(float64(w) / float64(h))
+	for _, b := range sdxlBuckets {
+		if d := math.Abs(math.Log(float64(b[0])/float64(b[1])) - r); d < bestD {
+			best, bestD = b, d
+		}
+	}
+	return best[0], best[1]
+}
+
+// run queues a workflow, polls its history and downloads the first output
+// file that want accepts.
+func (c *Comfy) run(ctx context.Context, wf map[string]any, want func(name string) bool) (comfyFile, []byte, string, error) {
 	var queued struct {
 		PromptID   string          `json:"prompt_id"`
 		NodeErrors json.RawMessage `json:"node_errors"`
 	}
 	if err := doJSON(ctx, c.Auth, "POST", c.URL+"/prompt", map[string]any{"prompt": wf, "client_id": "partycockpit"}, &queued); err != nil {
-		return nil, "", "", fmt.Errorf("comfy prompt: %w", err)
+		return comfyFile{}, nil, "", fmt.Errorf("comfy prompt: %w", err)
 	}
 	id := queued.PromptID
 	poll := c.Poll
@@ -141,33 +191,49 @@ func (c *Comfy) Animate(ctx context.Context, req AnimateRequest) ([]byte, string
 	}
 	for {
 		if err := sleep(ctx, poll); err != nil {
-			return nil, "", id, err
+			return comfyFile{}, nil, id, err
 		}
 		var hist map[string]comfyHistory
 		if err := doJSON(ctx, c.Auth, "GET", c.URL+"/history/"+id, nil, &hist); err != nil {
-			return nil, "", id, fmt.Errorf("comfy history: %w", err)
+			return comfyFile{}, nil, id, fmt.Errorf("comfy history: %w", err)
 		}
 		h, ok := hist[id]
 		if !ok {
 			continue // still queued or running
 		}
 		if h.Status.StatusStr == "error" {
-			return nil, "", id, fmt.Errorf("comfy run failed: %s", h.errorText())
+			return comfyFile{}, nil, id, fmt.Errorf("comfy run failed: %s", h.errorText())
 		}
-		f, ok := h.clip()
+		f, ok := h.output(want)
 		if !ok {
 			if h.Status.Completed {
-				return nil, "", id, errors.New("comfy finished without a video output")
+				return comfyFile{}, nil, id, errors.New("comfy finished without the expected output")
 			}
 			continue
 		}
 		q := url.Values{"filename": {f.Filename}, "subfolder": {f.Subfolder}, "type": {f.Type}}
-		var clip []byte
-		if err := doJSON(ctx, c.Auth, "GET", c.URL+"/view?"+q.Encode(), nil, &clip); err != nil {
-			return nil, "", id, fmt.Errorf("comfy download: %w", err)
+		var out []byte
+		if err := doJSON(ctx, c.Auth, "GET", c.URL+"/view?"+q.Encode(), nil, &out); err != nil {
+			return comfyFile{}, nil, id, fmt.Errorf("comfy download: %w", err)
 		}
-		return clip, strings.TrimPrefix(filepath.Ext(f.Filename), "."), id, nil
+		return f, out, id, nil
 	}
+}
+
+func isVideoFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp4", ".webm", ".gif", ".webp":
+		return true
+	}
+	return false
+}
+
+func isImageFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	}
+	return false
 }
 
 type comfyFile struct {
@@ -186,8 +252,8 @@ type comfyHistory struct {
 	Outputs map[string]map[string]json.RawMessage `json:"outputs"`
 }
 
-// clip finds the first video file among the outputs.
-func (h comfyHistory) clip() (comfyFile, bool) {
+// output finds the first output file that want accepts (temp previews skipped).
+func (h comfyHistory) output(want func(name string) bool) (comfyFile, bool) {
 	for _, kinds := range h.Outputs {
 		for _, raw := range kinds {
 			var files []comfyFile
@@ -195,8 +261,7 @@ func (h comfyHistory) clip() (comfyFile, bool) {
 				continue
 			}
 			for _, f := range files {
-				switch strings.ToLower(filepath.Ext(f.Filename)) {
-				case ".mp4", ".webm", ".gif", ".webp":
+				if f.Type != "temp" && want(f.Filename) {
 					return f, true
 				}
 			}
@@ -250,7 +315,7 @@ func (c *Comfy) upload(ctx context.Context, name string, data []byte) (string, e
 }
 
 func (c *Comfy) driver(ctx context.Context, motion string) (string, error) {
-	name := "pc_driver_" + motion + ".mp4"
+	name := "party_driver_" + motion + ".mp4"
 	if c.DriverDir == "" {
 		return name, nil // placed on the host by hand
 	}

@@ -38,8 +38,9 @@ type Config struct {
 	// DJfy relay (now playing + shared queue).
 	DJfyURL string // DJFY_URL
 
-	// Restyle provider: "restyler" (Restyler backend, restyle_flux), "kontext" (AiStack
-	// flux-kontext NIM) or "mock" (local colour filter, no GPU).
+	// Restyle provider: "restyler" (Restyler backend, restyle_flux), "comfy" (the same
+	// restyle_flux graph straight on COMFY_URL), "kontext" (AiStack flux-kontext NIM)
+	// or "mock" (local colour filter, no GPU).
 	RestyleProvider string // RESTYLE_PROVIDER
 	RestylerURL     string // RESTYLER_API_URL
 	RestylerToken   string // RESTYLER_APP_TOKEN
@@ -53,6 +54,7 @@ type Config struct {
 	// "restyler" (Restyler live_portrait; no dances) or "mock" (animated GIF).
 	AnimateProvider string // ANIMATE_PROVIDER
 	ComfyURL        string // COMFY_URL
+	ComfyToken      string // COMFY_TOKEN, sent as Bearer (a token-checking proxy in front of ComfyUI)
 	DriverDir       string // PC_DRIVER_DIR, LivePortrait driver clips <motion>.mp4 to upload
 	AnimWorkers     int    // PC_ANIM_WORKERS
 
@@ -108,6 +110,7 @@ func Load() Config {
 		CFClientSecret:           env("CF_ACCESS_CLIENT_SECRET", ""),
 		AnimateProvider:          env("ANIMATE_PROVIDER", "mock"),
 		ComfyURL:                 strings.TrimRight(env("COMFY_URL", "http://127.0.0.1:8188"), "/"),
+		ComfyToken:               env("COMFY_TOKEN", ""),
 		DriverDir:                env("PC_DRIVER_DIR", ""),
 		AnimWorkers:              num("PC_ANIM_WORKERS", 1),
 		TranslatorURL:            strings.TrimRight(env("TRANSLATOR_URL", ""), "/"),

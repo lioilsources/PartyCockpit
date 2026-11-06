@@ -99,6 +99,18 @@ func (s *Server) boxBaseURL() string {
 	return "http://" + net.JoinHostPort(ips[0], port)
 }
 
+// LANURL is what phones open (startup hint); empty without a LAN address.
+func (s *Server) LANURL() string { return s.boxBaseURL() }
+
+// StartURL is the home page on this machine (startup hint).
+func (s *Server) StartURL() string {
+	port := "8098"
+	if _, p, err := net.SplitHostPort(s.Cfg.Addr); err == nil && p != "" {
+		port = p
+	}
+	return "http://localhost:" + port
+}
+
 // openParty is the newest party that has not ended.
 func (s *Server) openParty(ctx context.Context) (store.Party, bool) {
 	ps, err := s.Store.Parties(ctx) // newest first
@@ -140,7 +152,7 @@ func (s *Server) startPairing(code string) {
 	s.pmu.Unlock()
 }
 
-// pairingMsg: the pairing QR for the box's own stage, or null when it is off.
+// pairingMsg: the pairing QR for the stage on this machine (box or laptop), or null when it is off.
 func (s *Server) pairingMsg(ctx context.Context, code string) hub.Msg {
 	s.pmu.Lock()
 	until, on := s.pairUntil[code]
@@ -179,8 +191,8 @@ func (s *Server) endPairing(ctx context.Context, code string) {
 
 // pair (cockpit): show the pairing QR again, e.g. for a second operator.
 func (s *Server) pair(w http.ResponseWriter, r *http.Request, p store.Party) {
-	if !s.Cfg.Box {
-		writeErr(w, 409, "párování je jen na party boxu")
+	if s.boxBaseURL() == "" {
+		writeErr(w, 409, "není adresa pro telefony: nastav PC_PUBLIC_URL")
 		return
 	}
 	s.startPairing(p.Code)

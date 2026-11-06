@@ -133,6 +133,17 @@ návratu se sám připojil se stejným stavem. S `PC_COCKPIT_UI=react` vedl odka
 Konzole bez chyb. Neověřeno: náhledy živých streamů a mikrofon v Reactu
 (potřebují kameru a https), React varování v dev buildu jen přes testy.
 
+## 2026-11-06: Notebook jako party box, restyle přes ComfyUI (D22)
+
+| Část | Stav |
+|---|---|
+| release: Linux arm64/amd64, Windows zip, návod pro notebook | ✅ `make dist` |
+| `.env` načítaný binárkou, LAN adresa v QR z localhost, párovací QR mimo box | ✅ testy |
+| `RESTYLE_PROVIDER=comfy` (restyle_flux v ComfyUI), `COMFY_TOKEN`, prefix `party_` | ✅ test proti fake ComfyUI |
+
+Neověřeno: restyle_flux na skutečném ComfyUI na L40S (modely PuLID a depth
+musí být na VM), Windows build na skutečném Windows, Cloudflare Tunnel.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).

@@ -296,3 +296,32 @@ Zadání: `Prompts/03-COCKPIT-REACT.md`.
   - „Konec hry“ přepíná na mezihru s počtem dob ze scénového panelu; React
     posílá výchozích 8, protože panel scén drží svůj stav sám.
 
+
+## D22: Notebook jako party box, restyle přes ComfyUI (2026-11-06)
+- **Release ke stažení** (GitHub Release, odkazy na olin.now): `linux-arm64`
+  (Pi), `linux-amd64` a `windows-amd64.zip`. Windows jen jako notebook u TV,
+  bez instalátoru a služeb; kiosk a systemd zůstávají na Linuxu (D20).
+  Návod `deploy/laptop/README.txt` je v obou balíčcích.
+- Binárka sama načte `.env` z pracovního adresáře (proměnné prostředí mají
+  přednost), aby šla na Windows spustit dvojklikem.
+- Plátno otevřené na stejném počítači (localhost) dává do QR LAN adresu i mimo
+  režim boxu. Párovací QR (Cockpit do telefonu) jde z Cockpitu i na notebooku;
+  ukáže se jen na plátně otevřeném na serveru samém (loopback), jako na boxu.
+- **`RESTYLE_PROVIDER=comfy`**: graf `restyle_flux` z Restyleru (FLUX dev +
+  PuLID + depth ControlNet) posílá PartyCockpit přímo do ComfyUI na
+  `COMFY_URL`, bez Restyler API. Šablona je kopie
+  `MangaPrompts-restyler` `assets/comfyui/flux_restyle.api.json` (větev
+  `feat/restyler`); rozměr je SDXL bucket nejbližší poměru stran fotky.
+  Restyle a animace sdílí jeden klient a frontu ComfyUI. Kontext se na restyle
+  nepoužívá: překreslí celý snímek a bez masky nedává smysl.
+- Soubory na GPU hostu mají prefix `party_` (uploady, drivery, výstupy), aby
+  úklid po party smazal jen je.
+- `COMFY_TOKEN` (volitelný): `Authorization: Bearer` pro proxy s tokenem před
+  ComfyUI, když ComfyUI není jen na 127.0.0.1.
+- **Licence:** PuLID používá InsightFace antelopev2, který je jen pro
+  nekomerční použití. Na soukromou party v pořádku, pro B2B (D10) otevřené,
+  stejně jako váhy LivePortrait (D13).
+- **https přes Cloudflare Tunnel** (návod pro notebook): telefony dostanou
+  certifikát Cloudflare bez vlastního certifikátu na boxu. Potřebuje internet a
+  `PC_TRUST_PROXY=1`, jinak mají všichni hosté přes tunel stejnou IP a narazí
+  na limity. Bez internetu dál platí certifikát přes DNS (D20).

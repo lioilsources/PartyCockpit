@@ -58,7 +58,7 @@ function RotateToken() {
 }
 
 export function Preflight() {
-  const { code, party, api, act, setErr } = useCockpit();
+  const { code, api, act, setErr } = useCockpit();
   const [checks, setChecks] = useState<Check[]>([]);
   const [checking, setChecking] = useState(false);
   const [done, setDone] = useStoredState(`pc.runbook.${code}`, {}, runbookCodec);
@@ -106,11 +106,9 @@ export function Preflight() {
           <p className={cx('muted', styles.small)}>
             Token unikl (fotka tabletu)? <RotateToken />
           </p>
-          {party.box && (
-            <p className={cx('muted', styles.small)}>
-              Druhý operátor? <button onClick={() => act(api.pair)}>Párovací QR na plátno</button> (10 min)
-            </p>
-          )}
+          <p className={cx('muted', styles.small)}>
+            Cockpit do telefonu? <button onClick={() => act(api.pair)}>Párovací QR na plátno</button> (10 min)
+          </p>
           <ul>
             {MANUAL.map((m) => (
               <li key={m.id}>

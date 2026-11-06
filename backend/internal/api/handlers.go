@@ -90,8 +90,8 @@ type PublicParty struct {
 
 func (s *Server) joinURL(r *http.Request, code string) string {
 	base := s.Cfg.PublicURL
-	if base == "" && s.Cfg.Box && isLoopbackHost(r.Host) {
-		// the box's own stage asks over 127.0.0.1; phones need the LAN address
+	if base == "" && isLoopbackHost(r.Host) {
+		// the stage on the box or laptop asks over localhost; phones need the LAN address
 		base = s.boxBaseURL()
 	}
 	if base == "" {

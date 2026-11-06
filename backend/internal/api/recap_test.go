@@ -75,7 +75,12 @@ func TestRecapAndPreflight(t *testing.T) {
 	for _, c := range pf.Checks {
 		got[c.ID] = c.Status
 	}
-	want := map[string]string{"join": "fail", "stage": "fail", "restyle": "warn", "animate": "warn", "djfy": "warn", "https": "warn", "ends": "warn"}
+	// a localhost join URL is swapped for the machine's LAN address; with none it fails
+	join := "ok"
+	if len(lanIPs()) == 0 {
+		join = "fail"
+	}
+	want := map[string]string{"join": join, "stage": "fail", "restyle": "warn", "animate": "warn", "djfy": "warn", "https": "warn", "ends": "warn"}
 	for id, st := range want {
 		if got[id] != st {
 			b, _ := json.Marshal(pf.Checks)

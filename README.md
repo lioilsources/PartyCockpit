@@ -32,6 +32,13 @@ Nad každou scénou běží emoji reakce (PixiJS), lišta s právě hrající sk
 
 ## Rychlý start
 
+Bez kompilace: stáhni balíček z [olin.now](https://olin.now) nebo
+z GitHub Releases (Windows zip, Linux amd64/arm64) a postupuj podle
+`README.txt` v něm (`deploy/laptop/README.txt`). Na Windows stačí dvojklik
+na `partycockpit.exe`.
+
+Ze zdrojáků:
+
 ```sh
 cp .env.example .env        # RESTYLE_PROVIDER=mock funguje bez GPU
 make build && make run      # → http://localhost:8098
@@ -49,6 +56,7 @@ Docker: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --bui
 | Služba | K čemu | Konfigurace |
 |---|---|---|
 | Restyler backend | restyle selfie (`restyle_flux`, drží obličej) | `RESTYLE_PROVIDER=restyler`, `RESTYLER_*` |
+| ComfyUI (L40S) | týž `restyle_flux` přímo v ComfyUI, bez Restyler API | `RESTYLE_PROVIDER=comfy`, `COMFY_URL` |
 | AiStack | záloha restyle (flux-kontext), NSFW tagger (WD14) | `AISTACK_URL`, `MODERATION=aistack` |
 | FineTuneGallery | obrázky do slideshow | `FINETUNE_URL` |
 | ComfyUI (L40S) | živé portréty (LivePortrait) a tanec (Wan 2.2 I2V) | `ANIMATE_PROVIDER=comfy`, `COMFY_URL` |
