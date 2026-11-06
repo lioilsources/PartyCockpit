@@ -1,7 +1,7 @@
 # PartyCockpit — one Go binary with the Svelte app embedded.
 BIN := bin/partycockpit
 
-.PHONY: all web build run dev test check docker styles
+.PHONY: all web build run dev test check docker styles dist shellcheck
 
 all: build
 
@@ -25,8 +25,32 @@ dev:
 test:
 	cd backend && go vet ./... && go test ./...
 
-check: test
+check: test shellcheck
 	cd frontend && npm run check && npm run build
+
+# party box scripts (deploy/box); skipped when shellcheck is not installed
+shellcheck:
+	@if command -v shellcheck >/dev/null; then shellcheck deploy/box/*.sh && echo "shellcheck ok"; \
+	else echo "shellcheck not installed, skipping deploy/box checks"; fi
+
+# Release tarballs for the party box (D20): dist/partycockpit-linux-{arm64,amd64}.tar.gz
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+ARCHES := arm64 amd64
+dist: web
+	rm -rf dist && mkdir -p dist
+	@for arch in $(ARCHES); do \
+		pkg=dist/partycockpit-$(VERSION)-linux-$$arch; \
+		mkdir -p $$pkg/bin $$pkg/assets $$pkg/deploy; \
+		(cd backend && CGO_ENABLED=0 GOOS=linux GOARCH=$$arch go build -trimpath \
+			-ldflags "-s -w -X main.version=$(VERSION)" -o ../$$pkg/bin/partycockpit ./cmd/partycockpit) || exit 1; \
+		cp -R assets/drivers $$pkg/assets/; \
+		cp -R deploy/box $$pkg/deploy/; \
+		cp .env.example $$pkg/; \
+		echo $(VERSION) > $$pkg/VERSION; \
+		COPYFILE_DISABLE=1 tar --no-xattrs -czf dist/partycockpit-linux-$$arch.tar.gz -C dist partycockpit-$(VERSION)-linux-$$arch; \
+		rm -rf $$pkg; \
+		echo "dist/partycockpit-linux-$$arch.tar.gz ($(VERSION))"; \
+	done
 
 # Regenerate the style catalog from a Restyler checkout (RESTYLER_DIR=../Restyler)
 styles:

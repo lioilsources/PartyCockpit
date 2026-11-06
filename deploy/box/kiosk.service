@@ -1,0 +1,25 @@
+[Unit]
+Description=PartyCockpit stage kiosk (Chromium under cage on tty1)
+After=partycockpit.service systemd-user-sessions.service
+Wants=partycockpit.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=party
+# a logind session on tty1 gives cage the seat (GPU, input) without root
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+ExecStart=/opt/partycockpit/bin/kiosk.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target multi-user.target

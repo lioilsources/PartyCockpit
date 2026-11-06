@@ -4,7 +4,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,12 +21,20 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/glyphs"
 	"github.com/lioilsources/PartyCockpit/backend/internal/hub"
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
+	"github.com/lioilsources/PartyCockpit/backend/internal/sdnotify"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
 	"github.com/lioilsources/PartyCockpit/backend/internal/subtitles"
 	"github.com/lioilsources/PartyCockpit/backend/internal/web"
 )
 
+// version is set at build time: -ldflags "-X main.version=…" (make dist).
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "-version" || os.Args[1] == "--version") {
+		fmt.Println(version)
+		return
+	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
 	if err := run(); err != nil {
 		slog.Error("fatal", "err", err)
@@ -113,7 +123,7 @@ func run() error {
 		defer cancel()
 		hs.Shutdown(sctx)
 	}()
-	slog.Info("partycockpit listening", "addr", cfg.Addr, "public", cfg.PublicURL, "restyle", restyler.Name(), "animate", animator.Name(), "moderation", cfg.Moderation, "web", srv.Web != nil)
+	slog.Info("partycockpit listening", "version", version, "addr", cfg.Addr, "public", cfg.PublicURL, "restyle", restyler.Name(), "animate", animator.Name(), "moderation", cfg.Moderation, "web", srv.Web != nil)
 	if cfg.TLSCert != "" {
 		ts := &http.Server{Addr: cfg.TLSAddr, Handler: hs.Handler, ReadHeaderTimeout: 10 * time.Second}
 		go func() {
@@ -127,8 +137,16 @@ func run() error {
 			}
 		}()
 	}
-	if err := hs.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
 		return err
 	}
+	// under systemd (party box): ready once we listen, watchdog while the DB answers
+	sdnotify.Notify("READY=1")
+	go sdnotify.Watchdog(ctx, func(c context.Context) bool { return st.Ping(c) == nil })
+	if err := hs.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	sdnotify.Notify("STOPPING=1")
 	return nil
 }

@@ -38,6 +38,12 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// Ping checks the database answers (systemd watchdog, D20).
+func (s *Store) Ping(ctx context.Context) error {
+	var n int
+	return s.db.QueryRowContext(ctx, "SELECT 1").Scan(&n)
+}
+
 func (s *Store) migrate(ctx context.Context) error {
 	var v int
 	if err := s.db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&v); err != nil {

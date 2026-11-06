@@ -1,0 +1,27 @@
+[Unit]
+Description=PartyCockpit backend (party box)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
+User=party
+Group=party
+WorkingDirectory=/opt/partycockpit
+EnvironmentFile=/opt/partycockpit/.env
+Environment=PC_DATA_DIR=/opt/partycockpit/data PC_DRIVER_DIR=/opt/partycockpit/assets/drivers
+ExecStart=/opt/partycockpit/bin/partycockpit
+Restart=always
+RestartSec=2
+# 8443 for https needs no privileges; plain http stays on 8098
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/opt/partycockpit/data
+ReadOnlyPaths=/opt/partycockpit/certs
+
+[Install]
+WantedBy=multi-user.target

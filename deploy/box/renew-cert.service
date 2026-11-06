@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew the party box certificate (lego, DNS-01)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/partycockpit/lego.env
+
+[Service]
+Type=oneshot
+ExecStart=/opt/partycockpit/bin/renew-cert.sh
