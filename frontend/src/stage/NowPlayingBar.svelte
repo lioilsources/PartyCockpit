@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import type { MusicSnapshot } from '../lib/types';
   let { music }: { music: MusicSnapshot | null } = $props();
   const np = $derived(music?.nowPlaying);
@@ -9,7 +10,7 @@
     {#if np.artworkUrl}<img src={np.artworkUrl} alt="" />{:else}<div class="art">♪</div>{/if}
     <div class="t">
       <strong>{np.title}</strong>
-      <span>{np.artist}{np.proposedByName ? ` · přidal(a) ${np.proposedByName}` : ''}</span>
+      <span>{np.artist}{np.proposedByName ? ` · ${t('stage.addedBy', { name: np.proposedByName })}` : ''}</span>
     </div>
   </div>
 {/if}

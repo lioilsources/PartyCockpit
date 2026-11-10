@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { fileUrl, type Asset } from '../../lib/types';
   import Handwritten from '../../lib/Handwritten.svelte';
 
@@ -20,20 +21,21 @@
       notes.set(n.guestId, [...(notes.get(n.guestId) ?? []), n]);
     }
     const used = new Map<string, number>();
-    const lines = ['Večer teprve začíná…', 'Mezitím u stolu…', 'O pár písniček později…', 'A pak to přišlo.', 'Nikdo nečekal, že…', 'Na parketu…'];
+    const lines = [0, 1, 2, 3, 4, 5].map((i) => t(`stage.strip.l${i}`));
     return photos.map((photo, i): Panel => {
       const k = used.get(photo.guestId) ?? 0;
       const note = notes.get(photo.guestId)?.[k];
       if (note) used.set(photo.guestId, k + 1);
-      const who = photo.meta.nickname ?? 'host';
-      const as = photo.meta.styleLabel && !photo.meta.fallback ? ` jako ${photo.meta.styleLabel}` : '';
-      return { photo, note, caption: i === 0 ? `${lines[0]} ${who}${as}.` : `${lines[i % lines.length]} ${who}${as}.` };
+      const who = photo.meta.nickname ?? t('stage.guest');
+      const line = i === 0 ? lines[0] : lines[i % lines.length];
+      const style = photo.meta.styleLabel && !photo.meta.fallback ? photo.meta.styleLabel : '';
+      return { photo, note, caption: style ? t('stage.strip.captionAs', { line, who, style }) : t('stage.strip.caption', { line, who }) };
     });
   });
 </script>
 
 <h1>{title}</h1>
-<p class="sub">díl 1 · dnešní večer</p>
+<p class="sub">{t('stage.strip.sub')}</p>
 {#each panels as p, i (p.photo.id)}
   <figure class="panel" style:--tilt={`${i % 2 ? 0.8 : -0.8}deg`}>
     <div class="caption">{p.caption}</div>
@@ -49,7 +51,7 @@
     {/if}
   </figure>
 {:else}
-  <p class="sub">Až operátor schválí první fotky, začne se tady psát party epizoda.</p>
+  <p class="sub">{t('stage.strip.empty')}</p>
 {/each}
 
 <style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '../lib/api';
+  import { t } from '../lib/i18n.svelte';
   import type { MusicSnapshot, Track } from '../lib/types';
 
   // DJfy: search goes through the host phone (the relay never touches SoundCloud),
@@ -22,7 +23,7 @@
     try {
       const r = await api.post<{ results: Track[] }>(`${base}/search`, { q });
       results = r.results ?? [];
-      if (!results.length) onmsg('Nic nenalezeno');
+      if (!results.length) onmsg(t('music.none'));
     } catch (e: any) {
       onmsg(e.message);
     } finally {
@@ -30,10 +31,10 @@
     }
   }
 
-  async function propose(t: Track) {
+  async function propose(track: Track) {
     try {
-      const r = await api.post<{ toast: string }>(`${base}/propose`, { trackId: t.id });
-      onmsg(r.toast || `Přidáno: ${t.title}`);
+      const r = await api.post<{ toast: string }>(`${base}/propose`, { trackId: track.id });
+      onmsg(r.toast || t('music.added', { title: track.title }));
       results = [];
       q = '';
     } catch (e: any) {
@@ -53,7 +54,7 @@
 </script>
 
 {#if !djfyCode}
-  <p class="muted">Hudba z DJfy zatím není připojená.</p>
+  <p class="muted">{t('music.off')}</p>
 {:else}
   {#if music?.nowPlaying}
     <div class="np">
@@ -63,22 +64,22 @@
   {/if}
 
   <form onsubmit={(e) => { e.preventDefault(); search(); }}>
-    <input placeholder="Hledat na SoundCloudu" bind:value={q} />
-    <button class="primary" disabled={q.trim().length < 2 || searching}>{searching ? '…' : 'Hledat'}</button>
+    <input placeholder={t('music.search')} bind:value={q} />
+    <button class="primary" disabled={q.trim().length < 2 || searching}>{searching ? '…' : t('music.searchBtn')}</button>
   </form>
   {#if results.length}
     <ul>
-      {#each results as t (t.id)}
+      {#each results as r (r.id)}
         <li>
-          {#if t.artworkUrl}<img src={t.artworkUrl} alt="" />{/if}
-          <div class="t"><strong>{t.title}</strong><span>{t.artist}</span></div>
-          <button onclick={() => propose(t)}>+ přidat</button>
+          {#if r.artworkUrl}<img src={r.artworkUrl} alt="" />{/if}
+          <div class="t"><strong>{r.title}</strong><span>{r.artist}</span></div>
+          <button onclick={() => propose(r)}>{t('music.add')}</button>
         </li>
       {/each}
     </ul>
   {/if}
 
-  <h2>Fronta</h2>
+  <h2>{t('music.queue')}</h2>
   <ul>
     {#each music?.queue ?? [] as e (e.entryId)}
       <li class:blocked={e.blocked}>
@@ -87,7 +88,7 @@
         <button onclick={() => vote(e.entryId, -1)}>▼</button>
       </li>
     {:else}
-      <li class="muted">prázdná — přidej první skladbu</li>
+      <li class="muted">{t('music.empty')}</li>
     {/each}
   </ul>
 {/if}

@@ -209,7 +209,7 @@ func (s *Server) createGuest(w http.ResponseWriter, r *http.Request, p store.Par
 				suggest = fmt.Sprintf("%s %d", base, i)
 			}
 		}
-		writeJSON(w, 409, map[string]string{"error": "přezdívku už někdo má", "suggest": suggest})
+		writeJSON(w, 409, map[string]string{"error": "přezdívku už někdo má", "code": "nick_taken", "suggest": suggest})
 		return
 	}
 	g, err := s.Store.CreateGuest(r.Context(), p.Code, nick)

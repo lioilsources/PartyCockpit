@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import QRCode from 'qrcode';
 
   let { url, code }: { url: string; code: string } = $props();
@@ -11,7 +12,7 @@
 
 {#if src}
   <div class="qr">
-    <img {src} alt="QR pro připojení" />
+    <img {src} alt={t('stage.joinAlt')} />
     <div class="code">{code}</div>
   </div>
 {/if}

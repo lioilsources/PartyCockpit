@@ -12,6 +12,8 @@
   import Pad from './Pad.svelte';
   import type { Socket } from '../lib/ws';
   import { listSheets, type SheetInfo } from '../lib/handwriting';
+  import { moveLabel, t } from '../lib/i18n.svelte';
+  import LangPicker from '../lib/LangPicker.svelte';
 
   let { code }: { code: string } = $props();
 
@@ -44,7 +46,7 @@
       // nickname taken: offer the free variant the server found
       if (e.status === 409 && e.data?.suggest) {
         nick = e.data.suggest;
-        err = `${e.message}, co třeba „${e.data.suggest}“?`;
+        err = t('guest.nickTaken', { suggest: e.data.suggest });
       }
     }
   }
@@ -128,7 +130,7 @@
     try {
       await api.post(g('/stickers'), { text: note, color: noteColor, sheet: hand });
       note = '';
-      say('Vzkaz odeslán, objeví se po schválení ✍️');
+      say(t('guest.toast.note'));
       refresh();
     } catch (e: any) {
       say(e.message);
@@ -140,7 +142,7 @@
     try {
       await api.post(g('/ideas'), { text: idea });
       idea = '';
-      say('Díky! Z námětů vzniknou další díly 💡');
+      say(t('guest.toast.idea'));
     } catch (e: any) {
       say(e.message);
     }
@@ -152,47 +154,43 @@
     store.set(key, JSON.stringify(guest));
   }
 
-  const statusLabel: Record<string, string> = {
-    processing: '🎨 pracuje se…',
-    pending: '⏳ čeká na schválení',
-    approved: '✅ na plátně',
-    rejected: '— nepoužito',
-    failed: '⚠️ nepovedlo se',
-  };
+  const statusLabel = (s: string) => (['processing', 'pending', 'approved', 'rejected', 'failed'].includes(s) ? t(`status.${s}`) : s);
   const emojis = ['❤️', '🔥', '😂', '🎉', '👏', '😍', '🕺', '💃', '🍍', '🍌'];
 </script>
 
 {#if notFound}
-  <main class="center"><h1>Party nenalezena</h1><p class="muted">Zkontroluj kód na plátně.</p></main>
+  <main class="center"><h1>{t('guest.notFound')}</h1><p class="muted">{t('guest.notFoundHint')}</p></main>
 {:else if !guest}
   <main class="center">
-    <h1>{party?.name ?? 'Party'}</h1>
-    <p class="muted">Jak ti máme říkat? Jméno se ukáže na plátně u tvých fotek.</p>
+    <h1>{party?.name ?? t('guest.party')}</h1>
+    <p class="muted">{t('guest.joinHint')}</p>
     <form onsubmit={(e) => { e.preventDefault(); join(); }}>
-      <input placeholder="Přezdívka" bind:value={nick} maxlength="24" autocomplete="nickname" />
-      <button class="primary" disabled={!nick.trim()}>Jdu na to</button>
+      <input placeholder={t('guest.nick')} bind:value={nick} maxlength="24" autocomplete="nickname" />
+      <button class="primary" disabled={!nick.trim()}>{t('guest.go')}</button>
     </form>
     {#if err}<p class="err">{err}</p>{/if}
+    <LangPicker />
   </main>
 {:else}
   <main class="g">
     <header>
       <strong>{party?.name}</strong>
-      <span class="muted">ahoj {guest.nickname}</span>
-      <a class="recap" href={`/recap/${code}`}>🎞 Recap</a>
+      <span class="muted">{t('guest.hello', { nick: guest.nickname })}</span>
+      <LangPicker compact />
+      <a class="recap" href={`/recap/${code}`}>🎞 {t('guest.recap')}</a>
     </header>
 
     {#if won}
-      <div class="won">🎉 Vylosovali tě do: <strong>{won}</strong>! Běž k plátnu.<button onclick={() => (won = '')}>ok</button></div>
+      <div class="won">🎉 {t('guest.won', { game: won })}<button onclick={() => (won = '')}>{t('guest.ok')}</button></div>
     {/if}
 
     <nav>
-      <button class:on={tab === 'photo'} onclick={() => (tab = 'photo')}>📸<span>Fotka</span></button>
-      <button class:on={tab === 'live'} onclick={() => (tab = 'live')}>📡<span>Živě</span></button>
-      <button class:on={tab === 'music'} onclick={() => (tab = 'music')}>🎵<span>Hudba</span></button>
-      <button class:on={tab === 'note'} onclick={() => (tab = 'note')}>✍️<span>Vzkaz</span></button>
-      <button class:on={tab === 'idea'} onclick={() => (tab = 'idea')}>💡<span>Námět</span></button>
-      <button class:on={tab === 'play'} onclick={() => (tab = 'play')}>🎮<span>Hra</span></button>
+      <button class:on={tab === 'photo'} onclick={() => (tab = 'photo')}>📸<span>{t('guest.tab.photo')}</span></button>
+      <button class:on={tab === 'live'} onclick={() => (tab = 'live')}>📡<span>{t('guest.tab.live')}</span></button>
+      <button class:on={tab === 'music'} onclick={() => (tab = 'music')}>🎵<span>{t('guest.tab.music')}</span></button>
+      <button class:on={tab === 'note'} onclick={() => (tab = 'note')}>✍️<span>{t('guest.tab.note')}</span></button>
+      <button class:on={tab === 'idea'} onclick={() => (tab = 'idea')}>💡<span>{t('guest.tab.idea')}</span></button>
+      <button class:on={tab === 'play'} onclick={() => (tab = 'play')}>🎮<span>{t('guest.tab.play')}</span></button>
     </nav>
 
     <!-- kept mounted: switching tabs must not cut the stream -->
@@ -201,13 +199,13 @@
     </section>
     <section hidden={tab === 'live'}>
       {#if tab === 'photo'}
-        <Photo {code} guestId={guest.id} busy={mine.some((a) => a.status === 'processing' && a.kind !== 'live')} onsent={() => { say('Fotka se maluje na GPU 🎨'); refresh(); }} />
+        <Photo {code} guestId={guest.id} busy={mine.some((a) => a.status === 'processing' && a.kind !== 'live')} onsent={() => { say(t('guest.toast.photo')); refresh(); }} />
         <Dance {code} guestId={guest.id} {mine} busy={mine.some((a) => a.status === 'processing' && a.kind !== 'live')} onmsg={say} onsent={refresh} />
       {:else if tab === 'music'}
         <Music {code} guestId={guest.id} {music} djfyCode={party?.djfyCode ?? ''} onmsg={say} />
       {:else if tab === 'note'}
-        <h2>Vzkaz na zeď</h2>
-        <textarea bind:value={note} maxlength="140" rows="3" placeholder="Všechno nejlepší! 🎂"></textarea>
+        <h2>{t('guest.noteTitle')}</h2>
+        <textarea bind:value={note} maxlength="140" rows="3" placeholder={t('guest.notePlaceholder')}></textarea>
         <div class="colors">
           {#each noteColors as c (c)}
             <button class="sw" class:sel={noteColor === c} style:background={c} onclick={() => (noteColor = c)} aria-label={c}></button>
@@ -220,34 +218,34 @@
             {/each}
           </div>
           <div class="preview" style:background={noteColor}>
-            <Handwritten text={note.trim() || 'Všechno nejlepší! 🎂'} sheet={hand} cell={30} width={260} density={2} />
+            <Handwritten text={note.trim() || t('guest.notePlaceholder')} sheet={hand} cell={30} width={260} density={2} />
           </div>
         {/if}
-        <button class="primary wide" disabled={!note.trim()} onclick={sendNote}>Nalepit na zeď</button>
+        <button class="primary wide" disabled={!note.trim()} onclick={sendNote}>{t('guest.noteStick')}</button>
       {:else if tab === 'idea'}
-        <h2>Námět na webtoon</h2>
-        <p class="muted">Na plátně hrajeme hotové příběhy. Napiš, o čem by měl být další díl — kdo v něm hraje, co se stane.</p>
-        <textarea bind:value={idea} maxlength="1000" rows="5" placeholder="Olin omylem pozve na party mimozemšťany…"></textarea>
-        <button class="primary wide" disabled={idea.trim().length < 5} onclick={sendIdea}>Poslat námět</button>
+        <h2>{t('guest.ideaTitle')}</h2>
+        <p class="muted">{t('guest.ideaHint')}</p>
+        <textarea bind:value={idea} maxlength="1000" rows="5" placeholder={t('guest.ideaPlaceholder')}></textarea>
+        <button class="primary wide" disabled={idea.trim().length < 5} onclick={sendIdea}>{t('guest.ideaSend')}</button>
       {:else if tab === 'play'}
         {#if slot}
-          <h2>Hraješ! <span style:color={slot.color}>●</span></h2>
-          <p class="muted">Tvoje pálka má na plátně tuhle barvu. Táhni prstem doleva a doprava.</p>
+          <h2>{t('guest.playing')} <span style:color={slot.color}>●</span></h2>
+          <p class="muted">{t('guest.padHint')}</p>
           <Pad color={slot.color} send={(x) => sock.send({ type: 'game.input', data: { x } })} />
         {/if}
-        <h2>Hry o přestávce</h2>
-        <p class="muted">Kdo bude hrát, se losuje. Přihlas se do osudí.</p>
+        <h2>{t('guest.gamesTitle')}</h2>
+        <p class="muted">{t('guest.gamesHint')}</p>
         {#if guest.wantsToPlay}
-          <button class="on wide" onclick={() => setPlay(false)}>✓ Jsem v osudí (odhlásit)</button>
+          <button class="on wide" onclick={() => setPlay(false)}>{t('guest.inLottery')}</button>
         {:else}
-          <button class="primary wide" onclick={() => setPlay(true)}>Chci hrát</button>
+          <button class="primary wide" onclick={() => setPlay(true)}>{t('guest.wantPlay')}</button>
         {/if}
       {/if}
     </section>
 
     {#if mine.length}
       <section>
-        <h2>Moje</h2>
+        <h2>{t('guest.mine')}</h2>
         <ul class="mine">
           {#each mine as a (a.id)}
             <li>
@@ -256,12 +254,12 @@
                 <span class="t">{a.meta.text}</span>
               {:else if a.kind === 'live' || a.kind === 'dance'}
                 {#if a.file}<Clip src={ownFileUrl(code, guest.id, a.file)} cls="mini" />{:else}<span class="mini">{a.kind === 'dance' ? '💃' : '✨'}</span>{/if}
-                <span class="t">{a.kind === 'dance' ? `tanec ${a.meta.motionLabel ?? ''}` : 'živý portrét'}</span>
+                <span class="t">{a.kind === 'dance' ? t('guest.mineDance', { label: moveLabel(a.meta.motion, a.meta.motionLabel ?? '') }) : t('guest.mineLive')}</span>
               {:else}
                 {#if a.file}<img src={ownFileUrl(code, guest.id, a.file)} alt="" />{:else}<span class="mini">🎨</span>{/if}
                 <span class="t">{a.meta.styleLabel}</span>
               {/if}
-              <span class="st">{statusLabel[a.status] ?? a.status}</span>
+              <span class="st">{statusLabel(a.status)}</span>
             </li>
           {/each}
         </ul>

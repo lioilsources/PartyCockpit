@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '../lib/api';
+  import { moveLabel, t } from '../lib/i18n.svelte';
   import { ownFileUrl, type Asset, type Motion } from '../lib/types';
 
   // "Roztanči mě" (M4): pick one of my finished photos and a dance; the GPU makes a
@@ -28,7 +29,7 @@
     sending = true;
     try {
       await api.post(`/api/parties/${code}/guests/${guestId}/dance`, { assetId: photo, move });
-      onmsg('Tanec se učí na GPU 💃 — za pár minut, po schválení, jsi na plátně');
+      onmsg(t('dance.sent'));
       onsent();
     } catch (e: any) {
       onmsg(e.message);
@@ -38,9 +39,9 @@
   }
 </script>
 
-<h2>💃 Roztanči mě</h2>
+<h2>{t('dance.title')}</h2>
 {#if !photos.length}
-  <p class="muted">Nejdřív pošli fotku (nejlépe celou postavu). Až bude hotová, roztančíme ji.</p>
+  <p class="muted">{t('dance.noPhoto')}</p>
 {:else}
   <div class="pick">
     {#each photos.slice(0, 8) as a (a.id)}
@@ -49,11 +50,11 @@
   </div>
   <div class="moves">
     {#each moves as m (m.id)}
-      <button class:on={move === m.id} onclick={() => (move = m.id)}>{m.label}</button>
+      <button class:on={move === m.id} onclick={() => (move = m.id)}>{moveLabel(m.id, m.label)}</button>
     {/each}
   </div>
   <button class="primary wide" disabled={!photo || sending || busy} onclick={send}>
-    {busy ? 'Ještě se ti něco maluje…' : sending ? 'Posílám…' : 'Roztančit'}
+    {busy ? t('dance.busy') : sending ? t('dance.sending') : t('dance.send')}
   </button>
 {/if}
 

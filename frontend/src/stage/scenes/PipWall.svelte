@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
   import { srcObject, type Viewer } from '../../lib/rtc';
@@ -33,14 +34,14 @@
       {#if media.get(s.id)}
         <video use:srcObject={media.get(s.id)} autoplay playsinline muted></video>
       {:else}
-        <div class="wait">připojuji…</div>
+        <div class="wait">{t('stage.pip.wait')}</div>
       {/if}
       <figcaption>{s.source === 'mirrorbooth' ? '🪞' : '📡'} {s.name}</figcaption>
     </figure>
   {:else}
     <div class="empty">
-      <h1>📡 Živě na plátně</h1>
-      <p>V telefonu otevři záložku <strong>Živě</strong> nebo MirrorBooth → „Stream to party“.</p>
+      <h1>{t('stage.pip.title')}</h1>
+      <p>{t('stage.pip.hint')}</p>
     </div>
   {/each}
 </div>

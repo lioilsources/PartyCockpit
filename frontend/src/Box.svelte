@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import QRCode from 'qrcode';
+  import { t, tn } from './lib/i18n.svelte';
 
   // Party box screen (D20): what the TV shows before there is a party. The
   // backend serves /box to the box's own kiosk only; once a party exists the
@@ -17,7 +18,7 @@
       info = await r.json();
       if (info?.url) qr = await QRCode.toDataURL(`${info.url}/`, { margin: 1, width: 520, color: { dark: '#0b0613', light: '#ffffff' } });
     } catch (e: any) {
-      err = 'backend se ještě spouští…';
+      err = t('box.starting');
     }
   }
   load();
@@ -34,23 +35,23 @@
     <div class="grid">
       <div class="qr">
         {#if qr}<img src={qr} alt="QR" />{/if}
-        <p>{info.autoParty ? 'Zakládám party…' : 'Naskenuj a založ party z telefonu'}</p>
+        <p>{info.autoParty ? t('box.autoParty') : t('box.scan')}</p>
       </div>
       <dl>
-        <dt>Adresa pro telefony</dt>
-        <dd>{info.url || 'box nemá síť'}</dd>
-        <dt>Zařízení</dt>
-        <dd>{info.hostname} · {info.ips.join(', ') || 'bez IP'}</dd>
-        <dt>Certifikát</dt>
+        <dt>{t('box.address')}</dt>
+        <dd>{info.url || t('box.noNet')}</dd>
+        <dt>{t('box.device')}</dt>
+        <dd>{info.hostname} · {info.ips.join(', ') || t('box.noIp')}</dd>
+        <dt>{t('box.cert')}</dt>
         <dd class:bad={certDays !== null && certDays < 14}>
-          {certDays === null ? 'není (kamera a mikrofon v telefonech nepojedou)' : certDays < 0 ? 'vypršel' : `platí ${certDays} dní`}
+          {certDays === null ? t('box.noCert') : certDays < 0 ? t('box.expired') : tn('box.days', certDays)}
         </dd>
-        <dt>Verze</dt>
+        <dt>{t('box.version')}</dt>
         <dd>{info.version}</dd>
       </dl>
     </div>
   {:else}
-    <p class="muted">{err || 'načítám…'}</p>
+    <p class="muted">{err || t('box.loading')}</p>
   {/if}
 </main>
 

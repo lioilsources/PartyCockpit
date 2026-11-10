@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from '../lib/api';
+  import { t } from '../lib/i18n.svelte';
 
   // Photo → Restyler style → Spark. The photo is scaled to ≤ 1536 px JPEG here:
   // the browser applies EXIF orientation when drawing, and iPhone HEIC decodes too.
@@ -36,7 +37,7 @@
       blob = await new Promise<Blob | null>((r) => c.toBlob(r, 'image/jpeg', 0.9));
       preview = c.toDataURL('image/jpeg', 0.6);
     } catch {
-      err = 'Tuhle fotku neumím otevřít, zkus jinou.';
+      err = t('photo.openFail');
     }
   }
 
@@ -63,15 +64,15 @@
   const inGroup = $derived(styles.filter((s) => s.group === group));
 </script>
 
-<h2>Selfie v jiném stylu</h2>
+<h2>{t('photo.title')}</h2>
 <label class="drop" class:has={preview}>
-  {#if preview}<img src={preview} alt="" />{:else}<span>📷 Vyfoť se nebo vyber fotku</span>{/if}
+  {#if preview}<img src={preview} alt="" />{:else}<span>{t('photo.pick')}</span>{/if}
   <input type="file" accept="image/*" onchange={pick} />
 </label>
 
 <div class="seg">
-  <button class:on={medium === 'illustration'} onclick={() => (medium = 'illustration')}>Ilustrace</button>
-  <button class:on={medium === 'photo'} onclick={() => (medium = 'photo')}>Fotka</button>
+  <button class:on={medium === 'illustration'} onclick={() => (medium = 'illustration')}>{t('photo.illustration')}</button>
+  <button class:on={medium === 'photo'} onclick={() => (medium = 'photo')}>{t('photo.photo')}</button>
 </div>
 
 <div class="groups">
@@ -86,7 +87,7 @@
 </div>
 
 <button class="primary send" disabled={!blob || !style || sending || busy} onclick={send}>
-  {busy ? 'Předchozí fotka se ještě maluje…' : sending ? 'Posílám…' : 'Poslat na plátno'}
+  {busy ? t('photo.busy') : sending ? t('photo.sending') : t('photo.send')}
 </button>
 {#if err}<p class="err">{err}</p>{/if}
 

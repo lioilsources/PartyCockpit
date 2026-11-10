@@ -1,7 +1,9 @@
 <script lang="ts">
   import { api, store } from '../lib/api';
   import Clip from '../lib/Clip.svelte';
-  import { fileUrl, plural, type Guest, type Recap, type RecapItem } from '../lib/types';
+  import { fileUrl, type Guest, type Recap, type RecapItem } from '../lib/types';
+  import { lang, t, tn } from '../lib/i18n.svelte';
+  import LangPicker from '../lib/LangPicker.svelte';
 
   // /recap/<code> (M7): what was on the screen tonight, to take home. The phone
   // that joined the party sees its own pictures first.
@@ -21,14 +23,14 @@
   api
     .get<Recap>(`/api/parties/${code}/recap`)
     .then((r) => (recap = r))
-    .catch((e) => (err = e.status === 404 ? 'Tahle party už neexistuje (fotky se mažou 7 dní po konci).' : e.message));
+    .catch((e) => (err = e.status === 404 ? t('recap.gone') : e.message));
 
   const media = $derived((recap?.items ?? []).filter((i) => i.kind !== 'sticker'));
   const notes = $derived((recap?.items ?? []).filter((i) => i.kind === 'sticker'));
   // nicknames are not unique, so "mine" is a convenience sort, not access control
   const sorted = $derived(me ? [...media.filter((i) => i.nickname === me), ...media.filter((i) => i.nickname !== me)] : media);
   const mineCount = $derived(me ? media.filter((i) => i.nickname === me).length : 0);
-  const purge = $derived(recap ? new Date(recap.purgeAt).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' }) : '');
+  const purge = $derived(recap ? new Date(recap.purgeAt).toLocaleDateString(lang(), { day: 'numeric', month: 'long' }) : '');
 
   const dl = (i: RecapItem, file = i.file) => `${fileUrl(code, file)}`;
   const name = (i: RecapItem, file = i.file ?? '') => `${(i.nickname ?? 'party').replace(/[^\p{L}\p{N}]+/gu, '-')}-${i.kind}${file.slice(file.lastIndexOf('.'))}`;
@@ -38,15 +40,17 @@
   {#if err}
     <p class="err">{err}</p>
   {:else if !recap}
-    <p class="muted">načítám…</p>
+    <p class="muted">{t('recap.loading')}</p>
   {:else}
     <header>
       <h1>{recap.name}</h1>
       <p class="muted">
-        {media.length} {plural(media.length, 'obrázek', 'obrázky', 'obrázků')}{#if mineCount}, z toho {mineCount} {plural(mineCount, 'tvůj', 'tvoje', 'tvých')}{/if}.
-        Ke stažení do {purge}, pak se všechno smaže.
+        {mineCount
+          ? t('recap.summaryMine', { images: tn('recap.images', media.length), mine: tn('recap.mine', mineCount), date: purge })
+          : t('recap.summary', { images: tn('recap.images', media.length), date: purge })}
       </p>
-      {#if media.length}<a class="all" href={`/api/parties/${code}/recap.zip`} download>⬇ Stáhnout vše (zip)</a>{/if}
+      <LangPicker />
+      {#if media.length}<a class="all" href={`/api/parties/${code}/recap.zip`} download>{t('recap.all')}</a>{/if}
     </header>
 
     <div class="grid">
@@ -54,17 +58,17 @@
         <button class="tile" class:mine={me && i.nickname === me} onclick={() => (open = i)}>
           <!-- stills in the grid (a phone can't play 30 loops); the loop opens on tap -->
           <Clip src={fileUrl(code, i.file)} />
-          <span>{i.nickname ?? 'host'}{#if i.kind === 'dance'} · 💃{/if}</span>
+          <span>{i.nickname ?? t('recap.guest')}{#if i.kind === 'dance'} · 💃{/if}</span>
         </button>
       {:else}
-        <p class="muted">Na plátně se dnes nic neobjevilo.</p>
+        <p class="muted">{t('recap.empty')}</p>
       {/each}
     </div>
 
     {#if notes.length}
-      <h2>Vzkazy</h2>
+      <h2>{t('recap.notesTitle')}</h2>
       <ul class="notes">
-        {#each notes as n (n.id)}<li style:--c={n.color ?? 'var(--yellow)'}><strong>{n.nickname ?? 'host'}:</strong> {n.text}</li>{/each}
+        {#each notes as n (n.id)}<li style:--c={n.color ?? 'var(--yellow)'}><strong>{n.nickname ?? t('recap.guest')}:</strong> {n.text}</li>{/each}
       </ul>
     {/if}
   {/if}
@@ -76,11 +80,11 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="card" onclick={(e) => e.stopPropagation()}>
       <Clip src={fileUrl(code, open.live ?? open.file)} />
-      <p><strong>{open.nickname ?? 'host'}</strong>{#if open.label} · {open.label}{/if}</p>
+      <p><strong>{open.nickname ?? t('recap.guest')}</strong>{#if open.label} · {open.label}{/if}</p>
       <div class="row">
-        <a class="primary" href={dl(open)} download={name(open)}>⬇ {open.kind === 'dance' ? 'Tanec' : 'Fotka'}</a>
-        {#if open.live}<a href={dl(open, open.live)} download={name(open, open.live)}>⬇ Živý portrét</a>{/if}
-        <button onclick={() => (open = null)}>Zavřít</button>
+        <a class="primary" href={dl(open)} download={name(open)}>{open.kind === 'dance' ? t('recap.dlDance') : t('recap.dlPhoto')}</a>
+        {#if open.live}<a href={dl(open, open.live)} download={name(open, open.live)}>{t('recap.dlLive')}</a>{/if}
+        <button onclick={() => (open = null)}>{t('recap.close')}</button>
       </div>
     </div>
   </div>

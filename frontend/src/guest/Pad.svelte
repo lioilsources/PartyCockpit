@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { t } from '../lib/i18n.svelte';
 
   // Game controller (D17): drag across the pad, the paddle follows. Sends the
   // position 0..1 at most 25× a second (the party socket allows 40 messages/s).
@@ -26,6 +27,7 @@
 
 <div
   class="pad"
+  dir="ltr"
   bind:this={pad}
   style:--c={color}
   onpointerdown={(e) => {
@@ -40,7 +42,7 @@
   tabindex="0"
 >
   <div class="knob" style:left={`${x * 100}%`}></div>
-  <span>⟵ táhni ⟶</span>
+  <span>⟵ {t('pad.drag')} ⟶</span>
 </div>
 
 <style>

@@ -330,8 +330,46 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+// errCodes gives the messages a phone can see a stable code. The message stays Czech
+// (the operator Cockpit shows it as is); the guest app, stage and recap translate the
+// code through frontend/src/i18n/*.json (err.<code>).
+var errCodes = map[string]string{
+	"zadej přezdívku": "nick_required",
+	"party je plná":   "party_full",
+	"počkej, tvoje předchozí fotka se ještě maluje": "photo_busy",
+	"fotka je moc velká nebo chybí":                 "photo_too_big",
+	"chybí fotka":                                   "photo_missing",
+	"chyba při čtení fotky":                         "photo_read",
+	"neznámý styl":                                  "style_unknown",
+	"napiš vzkaz":                                   "note_empty",
+	"už jsi napsal dost vzkazů":                     "notes_limit",
+	"pomaleji, zeď nestíhá :)":                      "notes_slow",
+	"námět je moc krátký":                           "idea_short",
+	"už jsi poslal dost námětů":                     "ideas_limit",
+	"neznámé emoji":                                 "emoji_unknown",
+	"pomaleji :)":                                   "slow",
+	"moc rychle, chvilku počkej":                    "too_fast",
+	"neznámý tanec":                                 "dance_unknown",
+	"tuhle fotku nemáš":                             "photo_not_yours",
+	"něco se ti ještě maluje, chvilku počkej":       "dance_busy",
+	"na party už streamuje moc telefonů":            "live_full",
+	"stream nenalezen":                              "stream_not_found",
+	"party nenalezena":                              "party_not_found",
+	"host nenalezen":                                "guest_not_found",
+	"party skončila":                                "party_ended",
+	"z tohohle zařízení je otevřeno moc oken":       "too_many_windows",
+	"na party zatím nehraje DJfy":                   "djfy_off",
+	"hledej aspoň 2 znaky":                          "search_short",
+	"chybí skladba":                                 "track_missing",
+	"chyba serveru, zkus to za chvíli":              "server",
+}
+
 func writeErr(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, map[string]string{"error": msg})
+	body := map[string]string{"error": msg}
+	if c, ok := errCodes[msg]; ok {
+		body["code"] = c
+	}
+	writeJSON(w, code, body)
 }
 
 // serverErr logs the detail and answers a plain 500: a phone does not need

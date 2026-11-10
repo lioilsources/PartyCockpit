@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import { ShowQueue } from '../../lib/showqueue';
   import type { BeatClock } from '../../lib/beat';
@@ -47,7 +48,7 @@
     </div>
   {:else}
     <div class="empty">
-      <h1>Napiš vzkaz z telefonu ✍️</h1>
+      <h1>{t('stage.stickers.title')}</h1>
     </div>
   {/each}
 </div>

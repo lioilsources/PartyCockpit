@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import { api } from '../../lib/api';
   import type { Asset, Episode } from '../../lib/types';
@@ -24,7 +25,7 @@
       .get<Episode[]>('/api/webtoon')
       .then((eps) => {
         ep = eps.find((e) => e.id === params.episode) ?? eps[0] ?? null;
-        if (!ep) err = 'Žádné epizody v data/webtoon/';
+        if (!ep) err = t('stage.webtoon.noEpisodes');
       })
       .catch((e) => (err = e.message));
   });
@@ -50,13 +51,13 @@
 <div class="wt" bind:this={scroller}>
   {#if party}
     <PartyStrip {code} {queue} {title} />
-    <div class="end">pokračování příště · fotka, vzkaz a jsi v dalším panelu 📸</div>
+    <div class="end">{t('stage.webtoon.next')}</div>
   {:else if ep}
     <h1>{ep.title}</h1>
     {#each ep.panels as p (p)}<img src={p} alt="" />{/each}
-    <div class="end">konec · pošli nám námět na další díl 💡</div>
+    <div class="end">{t('stage.webtoon.end')}</div>
   {:else}
-    <p class="muted">{err || 'načítám…'}</p>
+    <p class="muted">{err || t('stage.loading')}</p>
   {/if}
 </div>
 

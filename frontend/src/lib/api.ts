@@ -1,3 +1,5 @@
+import { has, t } from './i18n-core';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -6,6 +8,12 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+/** The server sends a Czech message plus a stable `code`; the code picks the translation. */
+function apiError(status: number, data: any): ApiError {
+  const key = data?.code ? `err.${data.code}` : '';
+  return new ApiError(status, key && has(key) ? t(key) : (data?.error ?? t('err.http', { status })), data);
 }
 
 async function req<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
@@ -26,7 +34,7 @@ async function req<T>(method: string, path: string, body?: unknown, token?: stri
   } catch {
     /* not json */
   }
-  if (!r.ok) throw new ApiError(r.status, data?.error ?? `Chyba ${r.status}`, data);
+  if (!r.ok) throw apiError(r.status, data);
   return data as T;
 }
 
@@ -43,13 +51,13 @@ export const api = {
       body: JSON.stringify(body),
     });
     const data = await r.json().catch(() => null);
-    if (!r.ok) throw new ApiError(r.status, data?.error ?? `Chyba ${r.status}`);
+    if (!r.ok) throw apiError(r.status, data);
     return data as T;
   },
   adminGet: async <T>(p: string, adminToken: string) => {
     const r = await fetch(p, { headers: { 'X-Admin-Token': adminToken } });
     const data = await r.json().catch(() => null);
-    if (!r.ok) throw new ApiError(r.status, data?.error ?? `Chyba ${r.status}`);
+    if (!r.ok) throw apiError(r.status, data);
     return data as T;
   },
 };

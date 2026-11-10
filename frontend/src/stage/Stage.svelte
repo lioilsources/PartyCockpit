@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { connect } from '../lib/ws';
@@ -245,11 +246,11 @@
   {#if party && scene.kind !== 'lottery' && scene.kind !== 'recap' && scene.kind !== 'game'}
     <QrOverlay url={party.joinUrl} code={party.code} />
   {/if}
-  {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}
-  {#if !online && offlineSince && now - offlineSince > 30000}<div class="offline-label">server nedostupný, jedu z paměti</div>{/if}
+  {#if !online}<div class="offline" title={t('stage.offlineTitle')}></div>{/if}
+  {#if !online && offlineSince && now - offlineSince > 30000}<div class="offline-label">{t('stage.offline')}</div>{/if}
   {#if pairing}<PairingQr url={pairing} />{/if}
-  {#if !stageKey}<div class="nokey">Plátno otevři tlačítkem „Otevřít plátno“ v Cockpitu (nese klíč).</div>{/if}
-  {#if needsAudioClick}<div class="hint">klikni pro zapnutí mikrofonu (beat)</div>{/if}
+  {#if !stageKey}<div class="nokey">{t('stage.noKey')}</div>{/if}
+  {#if needsAudioClick}<div class="hint">{t('stage.audioClick')}</div>{/if}
 </div>
 
 <style>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import QRCode from 'qrcode';
 
   // Pairing QR on a party box's stage (D20): the organiser scans it and the
@@ -13,9 +14,9 @@
 
 {#if src}
   <div class="pair">
-    <img {src} alt="Párovací QR" />
-    <strong>Naskenuj = Cockpit</strong>
-    <span>ovládání party z telefonu</span>
+    <img {src} alt={t('stage.pairAlt')} />
+    <strong>{t('stage.pairScan')}</strong>
+    <span>{t('stage.pairSub')}</span>
   </div>
 {/if}
 
