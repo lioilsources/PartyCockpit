@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy, onMount } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
 
@@ -225,13 +226,13 @@
 
 <div class="kruh">
   <canvas bind:this={canvas}></canvas>
-  <h1 class="title">Kruh</h1>
+  <h1 class="title">{t('stage.kruh.title')}</h1>
   {#if players.length < 2}
-    <div class="center"><p>Nejdřív vylosuj aspoň dva hráče.</p></div>
+    <div class="center"><p>{t('stage.kruh.need')}</p></div>
   {:else if countdown > 0}
-    <div class="center"><span class="cd">{countdown}</span><p>Na telefonu: záložka Hra, táhni prstem</p></div>
+    <div class="center"><span class="cd">{countdown}</span><p>{t('stage.kruh.hint')}</p></div>
   {:else if winner}
-    <div class="center win" style:--c={winner.color}><p>Vítěz</p><strong>{winner.nickname}</strong></div>
+    <div class="center win" style:--c={winner.color}><p>{t('stage.kruh.winner')}</p><strong>{winner.nickname}</strong></div>
   {/if}
 </div>
 

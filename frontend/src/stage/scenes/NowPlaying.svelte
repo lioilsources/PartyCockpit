@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import QRCode from 'qrcode';
   import type { BeatClock } from '../../lib/beat';
@@ -17,13 +18,13 @@
   );
   const fmt = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
 
-  const t = setInterval(() => (now = Date.now()), 500);
+  const tick = setInterval(() => (now = Date.now()), 500);
   const off = clock.on(() => {
     beat = true;
     setTimeout(() => (beat = false), 120);
   });
   onDestroy(() => {
-    clearInterval(t);
+    clearInterval(tick);
     off();
   });
   $effect(() => {
@@ -39,12 +40,12 @@
       </div>
       <h1>{np.title}</h1>
       <h2>{np.artist}</h2>
-      {#if np.proposedByName}<p class="by">přidal(a) {np.proposedByName}</p>{/if}
+      {#if np.proposedByName}<p class="by">{t('stage.addedBy', { name: np.proposedByName })}</p>{/if}
       <div class="progress"><div style:width={`${(pos / Math.max(1, np.durationMs)) * 100}%`}></div></div>
       <div class="times"><span>{fmt(pos)}</span><span>{np.bpm ? `${Math.round(np.bpm)} BPM` : ''}</span><span>{fmt(np.durationMs)}</span></div>
     </div>
     <div class="right">
-      <h3>Další ve frontě</h3>
+      <h3>{t('stage.np.next')}</h3>
       <ol>
         {#each (music?.queue ?? []).filter((q) => !q.blocked).slice(0, 7) as q (q.entryId)}
           <li>
@@ -52,13 +53,13 @@
             <div class="votes">▲ {q.up}{#if q.down}<small> ▼ {q.down}</small>{/if}</div>
           </li>
         {:else}
-          <li class="muted">fronta je prázdná — přidej skladbu z telefonu</li>
+          <li class="muted">{t('stage.np.empty')}</li>
         {/each}
       </ol>
-      {#if qr}<div class="add"><img src={qr} alt="" /><span>Přidej skladbu<br />a hlasuj</span></div>{/if}
+      {#if qr}<div class="add"><img src={qr} alt="" /><span>{t('stage.np.add')}</span></div>{/if}
     </div>
   {:else}
-    <div class="empty"><h1>DJfy zatím nehraje</h1><p>v Cockpitu zadej kód DJfy party</p></div>
+    <div class="empty"><h1>{t('stage.np.idle')}</h1><p>{t('stage.np.idleHint')}</p></div>
   {/if}
 </div>
 

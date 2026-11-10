@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
   import { ShowQueue } from '../../lib/showqueue';
@@ -65,8 +66,8 @@
     </figure>
   {:else}
     <div class="empty">
-      <h1>💃 Tančírna</h1>
-      <p>V telefonu: Fotka → „Roztanči mě“. Za pár minut tančíš tady.</p>
+      <h1>{t('stage.dance.title')}</h1>
+      <p>{t('stage.dance.hint')}</p>
     </div>
   {/each}
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
 
   // Lottery for the intermission games (D6): names spin, then the winners land.
@@ -30,9 +31,9 @@
 </script>
 
 <div class="lot">
-  <h2>{params.game ? `Kdo hraje: ${params.game}` : 'Losování'}</h2>
+  <h2>{params.game ? t('stage.lot.who', { game: params.game }) : t('stage.lot.title')}</h2>
   {#if winners.length === 0}
-    <p class="muted">čekám na losování z Cockpitu…</p>
+    <p class="muted">{t('stage.lot.wait')}</p>
   {:else}
     {#if revealed < winners.length}<div class="spin">{shown}</div>{/if}
     <div class="winners">
@@ -41,7 +42,7 @@
       {/each}
     </div>
   {/if}
-  <p class="pool">v osudí: {candidates.length}</p>
+  <p class="pool">{t('stage.lot.pool', { n: candidates.length })}</p>
 </div>
 
 <style>

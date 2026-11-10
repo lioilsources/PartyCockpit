@@ -2,7 +2,8 @@
   import { onDestroy } from 'svelte';
   import QRCode from 'qrcode';
   import type { BeatClock } from '../../lib/beat';
-  import { fileUrl, plural, recapUrl, type Asset, type Party } from '../../lib/types';
+  import { fileUrl, recapUrl, type Asset, type Party } from '../../lib/types';
+  import { lang, moveLabel, t, tn } from '../../lib/i18n.svelte';
   import Clip from '../../lib/Clip.svelte';
 
   // Recap (M7): the closing scene. A mosaic of everything approved tonight, one
@@ -16,7 +17,7 @@
   const people = $derived(new Set(queue.map((a) => a.guestId)).size);
   const beats = $derived(Math.max(2, Number(params.beats) || 8));
   const url = $derived(party ? recapUrl(party.joinUrl) : '');
-  const purge = $derived(party ? new Date(party.endsAt + 7 * 864e5).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' }) : '');
+  const purge = $derived(party ? new Date(party.endsAt + 7 * 864e5).toLocaleDateString(lang(), { day: 'numeric', month: 'numeric' }) : '');
 
   let qr = $state('');
   $effect(() => {
@@ -47,25 +48,26 @@
   </div>
 
   <div class="panel">
-    <h1>Díky, že jste přišli!</h1>
+    <h1>{t('stage.recap.thanks')}</h1>
     <p class="stats">
-      {media.length} {plural(media.length, 'obrázek', 'obrázky', 'obrázků')} · {people} {plural(people, 'host', 'hosté', 'hostů')}
-      {#if notes.length}· {notes.length} {plural(notes.length, 'vzkaz', 'vzkazy', 'vzkazů')}{/if}
+      {notes.length
+        ? t('stage.recap.statsNotes', { images: tn('recap.images', media.length), people: tn('recap.people', people), notes: tn('recap.notes', notes.length) })
+        : t('stage.recap.stats', { images: tn('recap.images', media.length), people: tn('recap.people', people) })}
     </p>
     {#if hero}
       {#key hero.id}
         <figure class="hero">
           <Clip src={fileUrl(code, hero.kind === 'restyle' ? (hero.live ?? hero.file) : hero.file)} />
-          <figcaption>{hero.meta.nickname ?? 'host'}{#if hero.kind === 'dance'} · {hero.meta.motionLabel ?? 'tanec'}{/if}</figcaption>
+          <figcaption>{hero.meta.nickname ?? t('stage.guest')}{#if hero.kind === 'dance'} · {moveLabel(hero.meta.motion, hero.meta.motionLabel ?? t('stage.recap.dance'))}{/if}</figcaption>
         </figure>
       {/key}
     {/if}
     {#if qr}
       <div class="qr">
-        <img src={qr} alt="QR na recap" />
+        <img src={qr} alt={t('stage.recap.qrAlt')} />
         <div>
-          <strong>Stáhni si fotky</strong>
-          <span>naskenuj telefonem · ke stažení do {purge}</span>
+          <strong>{t('stage.recap.dl')}</strong>
+          <span>{t('stage.recap.scan', { date: purge })}</span>
         </div>
       </div>
     {/if}

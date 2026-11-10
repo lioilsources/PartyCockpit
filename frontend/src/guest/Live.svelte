@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { api } from '../lib/api';
+  import { t } from '../lib/i18n.svelte';
   import { connect, type Socket } from '../lib/ws';
   import { Publisher, srcObject, type RtcMsg } from '../lib/rtc';
   import type { LiveStream } from '../lib/types';
@@ -14,15 +15,8 @@
     onmsg,
   }: { code: string; guestId: string; iceServers: RTCIceServer[]; onmsg: (t: string) => void } = $props();
 
-  const filters = [
-    { id: 'none', label: 'Bez filtru' },
-    { id: 'mirrorL', label: '🪞 Zrcadlo L' },
-    { id: 'mirrorR', label: '🪞 Zrcadlo P' },
-    { id: 'kaleido', label: '✳️ Kaleido' },
-    { id: 'ufo', label: '👽 Ufon' },
-    { id: 'pop', label: '🌈 Pop' },
-  ] as const;
-  type FilterId = (typeof filters)[number]['id'];
+  const filters = ['none', 'mirrorL', 'mirrorR', 'kaleido', 'ufo', 'pop'] as const;
+  type FilterId = (typeof filters)[number];
 
   const secure = window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
   let filter = $state<FilterId>('mirrorL');
@@ -58,7 +52,7 @@
       draw();
       out = canvas.captureStream(24);
     } catch (e: any) {
-      onmsg(e?.name === 'NotAllowedError' ? 'Bez povolení kamery to nepůjde' : `Kamera: ${e?.message ?? e}`);
+      onmsg(e?.name === 'NotAllowedError' ? t('live.denied') : t('live.cameraErr', { message: e?.message ?? e }));
       stopCamera();
     } finally {
       starting = false;
@@ -118,7 +112,7 @@
           if (m.type === 'stream') {
             stream = m.data;
             if (m.data.status === 'ended') {
-              onmsg(m.data.reason ? `Stream skončil: ${m.data.reason}` : 'Stream skončil');
+              onmsg(m.data.reason ? t('live.endedReason', { reason: m.data.reason }) : t('live.ended'));
               endLocal();
             }
           } else if (m.type === 'rtc') pub?.handle(m.data as RtcMsg);
@@ -164,38 +158,35 @@
   });
 </script>
 
-<h2>Živě na plátně</h2>
+<h2>{t('live.title')}</h2>
 {#if !secure}
-  <p class="muted">
-    Vysílání z prohlížeče potřebuje zabezpečenou adresu (https). Na této party ho zkus přes aplikaci
-    <strong>MirrorBooth</strong> → „Stream to party“, nebo řekni operátorovi o https odkaz.
-  </p>
+  <p class="muted">{t('live.insecure')}</p>
 {:else}
   {#if out}
     <!-- svelte-ignore a11y_media_has_caption -->
     <video class="preview" use:srcObject={out} autoplay playsinline muted></video>
     <div class="chips">
-      {#each filters as f (f.id)}
-        <button class:on={filter === f.id} onclick={() => (filter = f.id)}>{f.label}</button>
+      {#each filters as f (f)}
+        <button class:on={filter === f} onclick={() => (filter = f)}>{t(`live.f.${f}`)}</button>
       {/each}
     </div>
     {#if !stream}
-      <button class="primary wide" onclick={goLive}>📡 Vysílat na plátno</button>
-      <button class="wide" onclick={stopCamera}>Vypnout kameru</button>
+      <button class="primary wide" onclick={goLive}>{t('live.go')}</button>
+      <button class="wide" onclick={stopCamera}>{t('live.cameraOff')}</button>
     {:else}
       <p class="state">
         {#if stream.status === 'live'}
-          🔴 <strong>Jsi na plátně</strong>{viewers ? '' : ' — připojuji…'}
+          🔴 <strong>{t('live.onAir')}</strong>{viewers ? '' : ` — ${t('live.connecting')}`}
         {:else}
-          ⏳ Čekáš, až tě operátor pustí na plátno
+          {t('live.waiting')}
         {/if}
       </p>
-      <p class="muted">Nech telefon odemčený a stránku otevřenou.</p>
-      <button class="bad wide" onclick={stopLive}>Ukončit vysílání</button>
+      <p class="muted">{t('live.keepOpen')}</p>
+      <button class="bad wide" onclick={stopLive}>{t('live.stop')}</button>
     {/if}
   {:else}
-    <p class="muted">Tvoje kamera se objeví v mřížce na plátně (když tě operátor schválí). Zvuk se neposílá.</p>
-    <button class="primary wide" disabled={starting} onclick={startCamera}>{starting ? '…' : 'Zapnout kameru'}</button>
+    <p class="muted">{t('live.intro')}</p>
+    <button class="primary wide" disabled={starting} onclick={startCamera}>{starting ? '…' : t('live.cameraOn')}</button>
   {/if}
 {/if}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import { api, store } from '../../lib/api';
   import { shuffle } from '../../lib/showqueue';
@@ -24,7 +25,7 @@
     try {
       images = shuffle(await api.get<GalleryImage[]>(`/api/gallery?${q}`));
       store.set(ck, JSON.stringify(images));
-      err = images.length ? '' : 'Galerie nevrátila žádné SFW obrázky';
+      err = images.length ? '' : t('stage.galleryEmpty');
     } catch (e: any) {
       images = JSON.parse(store.get(ck) ?? '[]');
       err = images.length ? '' : e.message;

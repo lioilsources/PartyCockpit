@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../../lib/i18n.svelte';
   import { onDestroy } from 'svelte';
   import { ShowQueue } from '../../lib/showqueue';
   import type { BeatClock } from '../../lib/beat';
@@ -60,8 +61,8 @@
     </div>
   {:else}
     <div class="empty">
-      <h1>Pošli selfie z telefonu</h1>
-      <p>naskenuj QR vpravo dole → vyber styl → objevíš se tady</p>
+      <h1>{t('stage.gallery.title')}</h1>
+      <p>{t('stage.gallery.hint')}</p>
     </div>
   {/if}
 </div>

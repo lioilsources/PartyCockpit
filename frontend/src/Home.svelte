@@ -1,6 +1,8 @@
 <script lang="ts">
   import { api, store } from './lib/api';
   import type { Party } from './lib/types';
+  import { lang, t } from './lib/i18n.svelte';
+  import LangPicker from './lib/LangPicker.svelte';
 
   let adminToken = $state(store.get('pc.admin') ?? '');
   let name = $state('');
@@ -44,37 +46,38 @@
 
 <main>
   <h1>Party<span>Cockpit</span></h1>
-  <p class="muted">Velké plátno, telefony hostů, hudba z DJfy, obrázky ze Sparku.</p>
+  <p class="muted">{t('home.intro')}</p>
+  <LangPicker />
 
   <section>
-    <h2>Připojit se jako host</h2>
+    <h2>{t('home.joinTitle')}</h2>
     <form onsubmit={(e) => { e.preventDefault(); if (joinCode) location.href = `/join/${joinCode.trim().toUpperCase()}`; }}>
-      <input placeholder="Kód party (z plátna)" bind:value={joinCode} autocapitalize="characters" />
-      <button class="primary">Vstoupit</button>
+      <input placeholder={t('home.code')} bind:value={joinCode} autocapitalize="characters" />
+      <button class="primary">{t('home.enter')}</button>
     </form>
   </section>
 
   <section>
-    <h2>Nová party</h2>
+    <h2>{t('home.newTitle')}</h2>
     <form onsubmit={(e) => { e.preventDefault(); create(); }}>
-      <input placeholder="Název (např. Olinovy narozeniny)" bind:value={name} />
-      <input placeholder="Admin token (PC_ADMIN_TOKEN, pokud je nastaven)" type="password" bind:value={adminToken} onchange={load} />
-      <button class="primary">Založit party</button>
+      <input placeholder={t('home.name')} bind:value={name} />
+      <input placeholder={t('home.admin')} type="password" bind:value={adminToken} onchange={load} />
+      <button class="primary">{t('home.create')}</button>
     </form>
     {#if err}<p class="err">{err}</p>{/if}
   </section>
 
   {#if parties.length}
     <section>
-      <h2>Party</h2>
+      <h2>{t('home.parties')}</h2>
       <ul>
         {#each parties as p (p.code)}
           <li>
             <strong>{p.name}</strong> <code>{p.code}</code>
-            <span class="muted">{new Date(p.createdAt).toLocaleString('cs')}</span>
+            <span class="muted">{new Date(p.createdAt).toLocaleString(lang())}</span>
             <button onclick={() => cockpit(p)}>Cockpit</button>
             <button onclick={() => cockpit(p, '/react')}>Cockpit (React)</button>
-            <a href={`/stage/${p.code}?key=${p.stageKey}`} target="_blank">Plátno</a>
+            <a href={`/stage/${p.code}?key=${p.stageKey}`} target="_blank">{t('home.stage')}</a>
           </li>
         {/each}
       </ul>

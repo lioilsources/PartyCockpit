@@ -35,6 +35,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `frontend/src/lib/beat.ts` — BeatClock (tempo ze serveru / audio / idle), TapTempo
 - `frontend/src/lib/rtc.ts` — Viewer (plátno/Cockpit) a Publisher (telefon); MirrorBooth: `docs/mirrorbooth-stream.md`
 - `frontend/src/lib/showqueue.ts` — výběr z show fronty (nové napřed, pak loop/shuffle)
+- `frontend/src/lib/i18n-core.ts` + `src/i18n/*.json` — 45 jazyků pro hosta, plátno, recap, Home; Cockpit česky (`docs/i18n.md`)
 
 ## Invarianty
 - **Nic od hosta na plátno bez schválení.** Stage čte jen `stage_queue` (approved).
