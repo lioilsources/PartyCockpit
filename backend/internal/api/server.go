@@ -26,6 +26,7 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
 	"github.com/lioilsources/PartyCockpit/backend/internal/subtitles"
+	"github.com/lioilsources/PartyCockpit/backend/internal/webtoon"
 )
 
 type Server struct {
@@ -39,6 +40,9 @@ type Server struct {
 	Animator   providers.Animator
 	Subtitles  *subtitles.Client // nil = typed subtitles only
 	Glyphs     *glyphs.Set       // nil = notes in a font
+	// Webtoon episodes and the pack importer (D23); Init fills them from Cfg when nil.
+	Webtoon       *webtoon.Library
+	WebtoonImport *webtoon.Installer
 	Classifier providers.Classifier
 	Web        fs.FS  // built frontend (may be empty in dev)
 	Version    string // build version, shown on the box screen
@@ -90,6 +94,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
+	s.initWebtoon()
 	parties, err := s.Store.Parties(ctx)
 	if err != nil {
 		return err
@@ -193,7 +198,11 @@ func (s *Server) Routes() http.Handler {
 		s.Glyphs.Serve(w, r, r.PathValue("id"), r.PathValue("file"))
 	})
 	mux.HandleFunc("GET /api/webtoon", s.listWebtoon)
+	mux.HandleFunc("GET /api/webtoon/{id}", s.getWebtoon)
 	mux.HandleFunc("GET /webtoon/{ep}/{file}", s.serveWebtoon)
+	mux.HandleFunc("GET /api/parties/{code}/webtoon/catalog", s.cockpit(s.webtoonCatalog))
+	mux.HandleFunc("POST /api/parties/{code}/webtoon/install", s.cockpit(s.webtoonInstall))
+	mux.HandleFunc("DELETE /api/parties/{code}/webtoon/packs/{dir}", s.cockpit(s.webtoonRemove))
 
 	mux.HandleFunc("GET /box", s.box)
 	mux.HandleFunc("GET /api/box", s.boxInfo)

@@ -193,13 +193,28 @@
   let slideStyle = $state('');
   let beats = $state(8);
   let episodes = $state<Episode[]>([]);
-  let episode = $state('');
+  // webtoon (D23): up to 4 episodes side by side, bubble language, scroll speed
+  let wtEpisodes = $state<string[]>(JSON.parse(store.get('pc.webtoon.episodes') ?? '[]'));
+  let wtLang = $state(store.get('pc.webtoon.lang') ?? 'cs');
+  let wtSpeed = $state(Number(store.get('pc.webtoon.speed')) || 60);
   api.get<Episode[]>('/api/webtoon').then((e) => (episodes = e)).catch(() => {});
+  $effect(() => {
+    store.set('pc.webtoon.episodes', JSON.stringify(wtEpisodes));
+    store.set('pc.webtoon.lang', wtLang);
+    store.set('pc.webtoon.speed', String(wtSpeed));
+  });
+  function toggleEpisode(id: string) {
+    wtEpisodes = wtEpisodes.includes(id) ? wtEpisodes.filter((x) => x !== id) : [...wtEpisodes, id].slice(-4);
+  }
 
   function setScene(kind: SceneKind) {
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
-    if (kind === 'webtoon' && episode) params.episode = episode;
+    if (kind === 'webtoon') {
+      if (wtEpisodes.length) params.episodes = wtEpisodes;
+      params.lang = wtLang;
+      params.speed = wtSpeed;
+    }
     if (kind === 'stylesweep' && pack) params.pack = pack;
     else if (sweepTransition && pack) params.transition = pack;
     if (kind === 'interlude') {
@@ -363,13 +378,25 @@
           <label><input type="checkbox" bind:checked={sweepTransition} /> přechod přes StyleMap</label>
         {/if}
         <a href={recapUrl(party.joinUrl)} target="_blank">recap pro hosty ↗</a>
-        <label>epizoda
-          <select bind:value={episode}>
-            {#each episodes as e (e.id)}<option value={e.id}>{e.title}</option>{/each}
-            <option value="party">🎉 Party epizoda (z galerie)</option>
-          </select>
-        </label>
       </div>
+      <details class="episodes">
+        <summary>📖 Webtoon: {wtEpisodes.length ? `${wtEpisodes.length} ${plural(wtEpisodes.length, 'sloupec', 'sloupce', 'sloupců')}` : 'první epizoda'}</summary>
+        <div class="row small">
+          <label>jazyk bublin
+            <select bind:value={wtLang}>
+              {#each ['cs', 'en', 'de', 'fr', 'it', 'pl', 'uk'] as l (l)}<option value={l}>{l}</option>{/each}
+            </select>
+          </label>
+          <label>rychlost <input type="number" min="10" max="400" step="10" bind:value={wtSpeed} /> px/s</label>
+          <a href={`/studio/${code}`} target="_blank">stáhnout další ve Studiu ↗</a>
+        </div>
+        <div class="eplist">
+          <label><input type="checkbox" checked={wtEpisodes.includes('party')} onchange={() => toggleEpisode('party')} /> 🎉 Party epizoda (z galerie)</label>
+          {#each episodes as e (e.id)}
+            <label><input type="checkbox" checked={wtEpisodes.includes(e.id)} onchange={() => toggleEpisode(e.id)} /> {e.story ? `${e.story} · ` : ''}{e.title} <span class="muted">({e.n})</span></label>
+          {/each}
+        </div>
+      </details>
     </section>
 
     <details class="preflight" ontoggle={(e) => (e.currentTarget as HTMLDetailsElement).open && !checks.length && preflight()}>
@@ -931,5 +958,17 @@
   }
   .card.stream.live {
     outline: 2px solid var(--red);
+  }
+  .episodes summary {
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .eplist {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 4px 12px;
+    max-height: 260px;
+    overflow: auto;
+    font-size: 13px;
   }
 </style>

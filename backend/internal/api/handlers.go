@@ -10,10 +10,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -619,7 +616,7 @@ func (s *Server) lottery(w http.ResponseWriter, r *http.Request, p store.Party) 
 	writeJSON(w, 200, draw)
 }
 
-// ── gallery + webtoon ──────────────────────────────────────────────────────
+// ── gallery ──────────────────────────────────────────────────────
 
 func (s *Server) listGallery(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -631,52 +628,6 @@ func (s *Server) listGallery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, items)
-}
-
-// Webtoon episodes are prepared folders in $PC_DATA_DIR/webtoon/<episode>/ with
-// panel images named in reading order (D7); optional title.txt.
-func (s *Server) webtoonDir() string { return filepath.Join(s.Cfg.DataDir, "webtoon") }
-
-var safeName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$`)
-
-func (s *Server) listWebtoon(w http.ResponseWriter, r *http.Request) {
-	type ep struct {
-		ID     string   `json:"id"`
-		Title  string   `json:"title"`
-		Panels []string `json:"panels"`
-	}
-	out := []ep{}
-	dirs, _ := os.ReadDir(s.webtoonDir())
-	for _, d := range dirs {
-		if !d.IsDir() || !safeName.MatchString(d.Name()) {
-			continue
-		}
-		e := ep{ID: d.Name(), Title: d.Name()}
-		if t, err := os.ReadFile(filepath.Join(s.webtoonDir(), d.Name(), "title.txt")); err == nil {
-			e.Title = strings.TrimSpace(string(t))
-		}
-		files, _ := os.ReadDir(filepath.Join(s.webtoonDir(), d.Name()))
-		for _, f := range files {
-			n := strings.ToLower(f.Name())
-			if safeName.MatchString(f.Name()) && (strings.HasSuffix(n, ".png") || strings.HasSuffix(n, ".jpg") || strings.HasSuffix(n, ".jpeg") || strings.HasSuffix(n, ".webp")) {
-				e.Panels = append(e.Panels, "/webtoon/"+d.Name()+"/"+f.Name())
-			}
-		}
-		sort.Strings(e.Panels)
-		if len(e.Panels) > 0 {
-			out = append(out, e)
-		}
-	}
-	writeJSON(w, 200, out)
-}
-
-func (s *Server) serveWebtoon(w http.ResponseWriter, r *http.Request) {
-	ep, f := r.PathValue("ep"), r.PathValue("file")
-	if !safeName.MatchString(ep) || !safeName.MatchString(f) {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, filepath.Join(s.webtoonDir(), ep, f))
 }
 
 // ── metrics ────────────────────────────────────────────────────────────────

@@ -83,7 +83,25 @@ export type MusicSnapshot = {
 };
 
 export type GalleryImage = { id: number; sha256: string; prompt: string; styleId: string; url: string; thumb: string };
-export type Episode = { id: string; title: string; panels: string[] };
+/** A webtoon episode (D23): a hand-made folder or a Toonfork pack episode. */
+export type Episode = {
+  id: string;
+  title: string;
+  story?: string;
+  storyId?: string;
+  index: number;
+  cover?: string;
+  langs: string[];
+  audience?: string;
+  source: 'folder' | 'pack';
+  pack?: string;
+  n: number;
+};
+/** Bubble text is drawn by the stage; the panel images carry none. Positions are 0–1. */
+export type WtBubble = { kind: 'speech' | 'thought' | 'shout' | 'narration'; text: Record<string, string>; anchor?: { x: number; y: number } };
+export type WtSfx = { text: string; style?: string; pos?: { x: number; y: number } };
+export type WtPanel = { image: string; loop?: string; w?: number; h?: number; gap?: string; bubbles?: WtBubble[]; sfx?: WtSfx[] };
+export type EpisodeDetail = Episode & { panels: WtPanel[] };
 
 export type CockpitState = {
   assets: Asset[];

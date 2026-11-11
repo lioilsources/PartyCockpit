@@ -2,7 +2,16 @@ import { api as http } from '@pc/lib/api';
 import type { Check, CockpitState, Episode, Party, SceneKind } from '@pc/lib/types';
 
 export type PartyPatch = Partial<Pick<Party, 'mode' | 'loopMode' | 'djfyCode' | 'endsAt' | 'autoLive'>>;
-export type SceneParams = { beats: number; style?: string; episode?: string; pack?: string; transition?: string; shader?: string };
+export type SceneParams = {
+  beats: number;
+  style?: string;
+  episodes?: string[];
+  lang?: string;
+  speed?: number;
+  pack?: string;
+  transition?: string;
+  shader?: string;
+};
 export type TempoBody = { bpm: number; anchor?: number };
 
 /**

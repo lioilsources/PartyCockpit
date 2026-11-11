@@ -25,13 +25,33 @@ export const SHADERS = [
   ['aurora', 'Polární záře'],
 ] as const;
 
-export type SceneOptions = { beats: number; slideStyle: string; episode: string; pack: string; sweepTransition: boolean; shader: string };
+export type SceneOptions = {
+  beats: number;
+  slideStyle: string;
+  /** Webtoon columns (D23), up to 4; empty = the first episode. */
+  episodes: string[];
+  wtLang: string;
+  wtSpeed: number;
+  pack: string;
+  sweepTransition: boolean;
+  shader: string;
+};
+
+/** Bubble languages offered for webtoon packs. */
+export const WEBTOON_LANGS = ['cs', 'en', 'de', 'fr', 'it', 'pl', 'uk'] as const;
+
+/** Toggles an episode column; the oldest drops out past 4 (as in Svelte). */
+export const toggledEpisode = (list: readonly string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-4));
 
 /** Scene parameters exactly as the Svelte Cockpit sends them. */
 export function sceneParams(kind: SceneKind, o: SceneOptions): SceneParams {
   const params: SceneParams = { beats: o.beats };
   if (kind === 'slideshow' && o.slideStyle) params.style = o.slideStyle;
-  if (kind === 'webtoon' && o.episode) params.episode = o.episode;
+  if (kind === 'webtoon') {
+    if (o.episodes.length) params.episodes = [...o.episodes];
+    params.lang = o.wtLang;
+    params.speed = o.wtSpeed;
+  }
   if (kind === 'stylesweep' && o.pack) params.pack = o.pack;
   else if (o.sweepTransition && o.pack) params.transition = o.pack;
   if (kind === 'interlude') {
