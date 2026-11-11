@@ -3,9 +3,9 @@ import { readUrlToken } from '../hooks/useCockpitAuth';
 import { parseRoute } from '../route';
 import { ago, cx, extendedEnd } from './format';
 import { moved } from './queue';
-import { sceneParams } from './scene';
+import { sceneParams, toggledEpisode } from './scene';
 
-const opts = { beats: 8, slideStyle: '', episode: '', pack: '', sweepTransition: false, shader: '' };
+const opts = { beats: 8, slideStyle: '', episodes: [] as string[], wtLang: 'cs', wtSpeed: 60, pack: '', sweepTransition: false, shader: '' };
 
 describe('sceneParams', () => {
   it('matches what the Svelte Cockpit sends', () => {
@@ -13,7 +13,13 @@ describe('sceneParams', () => {
     expect(sceneParams('interlude', { ...opts, shader: 'tunnel' })).toEqual({ beats: 16, shader: 'tunnel' });
     expect(sceneParams('stylesweep', { ...opts, pack: 'cat' })).toEqual({ beats: 8, pack: 'cat' });
     expect(sceneParams('gallery', { ...opts, pack: 'cat', sweepTransition: true })).toEqual({ beats: 8, transition: 'cat' });
-    expect(sceneParams('webtoon', { ...opts, episode: 'party' })).toEqual({ beats: 8, episode: 'party' });
+    expect(sceneParams('webtoon', { ...opts, episodes: ['party', 'ep_1'], wtLang: 'en' })).toEqual({ beats: 8, episodes: ['party', 'ep_1'], lang: 'en', speed: 60 });
+    expect(sceneParams('webtoon', opts)).toEqual({ beats: 8, lang: 'cs', speed: 60 });
+  });
+
+  it('keeps at most 4 webtoon columns', () => {
+    expect(toggledEpisode(['a', 'b', 'c', 'd'], 'e')).toEqual(['b', 'c', 'd', 'e']);
+    expect(toggledEpisode(['a', 'b'], 'a')).toEqual(['b']);
   });
 });
 

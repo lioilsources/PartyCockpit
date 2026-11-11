@@ -208,7 +208,7 @@
       {:else if scene.kind === 'nowplaying'}
         <NowPlaying {music} joinUrl={party?.joinUrl ?? ''} {clock} />
       {:else if scene.kind === 'webtoon'}
-        <Webtoon params={scene.params} {code} {queue} title={party?.name ?? ''} />
+        <Webtoon params={scene.params} {code} {queue} title={party?.name ?? ''} startedAt={scene.startedAt} />
       {:else if scene.kind === 'lottery'}
         <Lottery params={scene.params} />
       {:else if scene.kind === 'dance'}

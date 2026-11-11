@@ -1,89 +1,72 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { api } from '../../lib/api';
+  import { rng } from '../../lib/rand';
   import type { Asset, Episode } from '../../lib/types';
-  import PartyStrip from './PartyStrip.svelte';
+  import Strip from './Strip.svelte';
 
-  // Pre-made episodes ("divadelní hry", D7), auto-scrolling strip.
-  // params: { episode?: string, speed?: px per second }; episode "party" = the
-  // strip of tonight's approved photos and notes (D18).
-  let { params, code, queue, title }: { params: Record<string, any>; code: string; queue: Asset[]; title: string } = $props();
-  const party = params.episode === 'party';
+  // Webtoon reader (D7, D23): 1–4 episodes side by side, each column scrolling
+  // at its own pace. Episode "party" is tonight's strip from approved photos (D18).
+  //   params.episodes  episode ids (params.episode, one id, still works)
+  //   params.speed     px per second at 1080p (default 60)
+  //   params.lang      bubble language (default cs)
+  //   params.loops     animated panels where the pack has them (default true)
+  //   params.seed      fixes each column's pace and start (Studio show)
+  let {
+    params,
+    code,
+    queue,
+    title,
+    startedAt = 0,
+  }: { params: Record<string, any>; code: string; queue: Asset[]; title: string; startedAt?: number } = $props();
 
-  let ep = $state<Episode | null>(null);
+  const asked: string[] = (Array.isArray(params.episodes) ? params.episodes : params.episode ? [params.episode] : [])
+    .filter((x: unknown) => typeof x === 'string' && x)
+    .slice(0, 4);
+  let ids = $state<string[]>(asked);
   let err = $state('');
-  let scroller: HTMLDivElement;
-  let raf = 0;
-  let last = 0;
-  let y = 0;
-  let pauseUntil = 0;
-
-  $effect(() => {
-    if (party) return;
+  if (!asked.length) {
     api
       .get<Episode[]>('/api/webtoon')
       .then((eps) => {
-        ep = eps.find((e) => e.id === params.episode) ?? eps[0] ?? null;
-        if (!ep) err = 'Žádné epizody v data/webtoon/';
+        ids = eps.slice(0, 1).map((e) => e.id);
+        if (!ids.length) err = 'Žádné epizody. Stáhni balík ve Studiu nebo dej panely do data/webtoon/.';
       })
       .catch((e) => (err = e.message));
-  });
-
-  function frame(t: number) {
-    const dt = last ? (t - last) / 1000 : 0;
-    last = t;
-    if (scroller && t > pauseUntil) {
-      y += (Number(params.speed) || 60) * dt;
-      const max = scroller.scrollHeight - scroller.clientHeight;
-      if (y >= max + 1) {
-        y = 0; // loop after a short pause at the end
-        pauseUntil = t + 4000;
-      }
-      scroller.scrollTop = y;
-    }
-    raf = requestAnimationFrame(frame);
   }
-  raf = requestAnimationFrame(frame);
-  onDestroy(() => cancelAnimationFrame(raf));
+
+  const speed = Math.min(400, Math.max(10, Number(params.speed) || 60));
+  const lang = typeof params.lang === 'string' && params.lang ? params.lang : 'cs';
+  const loops = params.loops !== false;
+  // each column its own pace (±15 %) and a staggered start
+  const rand = rng(params.seed, 1);
+  const pace = asked.map(() => 0.85 + rand() * 0.3);
+  const widths = ['46vw', '44vw', '30vw', '23vw'];
 </script>
 
-<div class="wt" bind:this={scroller}>
-  {#if party}
-    <PartyStrip {code} {queue} {title} />
-    <div class="end">pokračování příště · fotka, vzkaz a jsi v dalším panelu 📸</div>
-  {:else if ep}
-    <h1>{ep.title}</h1>
-    {#each ep.panels as p (p)}<img src={p} alt="" />{/each}
-    <div class="end">konec · pošli nám námět na další díl 💡</div>
+<div class="wt" style:--w={widths[Math.max(0, ids.length - 1)]}>
+  {#each ids as id, i (`${i}:${id}`)}
+    <div class="slot">
+      <Strip {id} speed={speed * (pace[i] ?? 1)} delay={i * 2.5} {lang} {loops} {startedAt} {code} {queue} {title} />
+    </div>
   {:else}
     <p class="muted">{err || 'načítám…'}</p>
-  {/if}
+  {/each}
 </div>
 
 <style>
   .wt {
     position: absolute;
     inset: 0;
-    overflow: hidden;
     background: #111;
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    justify-content: center;
+    gap: 1.5vw;
   }
-  h1 {
-    font-size: 3vw;
-    margin: 6vh 0;
+  .slot {
+    width: var(--w);
+    height: 100%;
   }
-  img {
-    width: min(46vw, 900px);
-    display: block;
-  }
-  .end {
-    padding: 20vh 0 40vh;
-    font-size: 2vw;
-    color: var(--yellow);
-  }
-  p {
+  p.muted {
     margin-top: 40vh;
     font-size: 1.6vw;
   }

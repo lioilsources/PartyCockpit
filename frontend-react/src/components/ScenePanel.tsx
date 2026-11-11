@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { listPacks, type PackInfo } from '@pc/lib/stylemap';
-import { recapUrl, type Episode, type SceneKind } from '@pc/lib/types';
+import { plural, recapUrl, type Episode, type SceneKind } from '@pc/lib/types';
 import { useCockpit } from '../CockpitContext';
-import { SCENES, SHADERS, sceneParams } from '../lib/scene';
-import { asFlag, asString, useStoredState } from '../hooks/useStoredState';
+import { SCENES, SHADERS, WEBTOON_LANGS, sceneParams, toggledEpisode } from '../lib/scene';
+import { asFlag, asJson, asString, useStoredState } from '../hooks/useStoredState';
 import { cx } from '../lib/format';
 import ui from './ui.module.css';
 
@@ -12,8 +12,11 @@ export function ScenePanel() {
   const [beats, setBeats] = useState(8);
   const [slideStyle, setSlideStyle] = useState('');
   const [shader, setShader] = useState('');
-  const [episode, setEpisode] = useState('');
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  // same keys as the Svelte Cockpit (D21)
+  const [wtEpisodes, setWtEpisodes] = useStoredState<string[]>('pc.webtoon.episodes', [], episodeList);
+  const [wtLang, setWtLang] = useStoredState('pc.webtoon.lang', 'cs', asString);
+  const [wtSpeed, setWtSpeed] = useStoredState('pc.webtoon.speed', 60, speedCodec);
   const [packs, setPacks] = useState<PackInfo[]>([]);
   const [pack, setPack] = useStoredState('pc.stylemap', '', asString);
   const [sweepTransition, setSweepTransition] = useStoredState('pc.stylemap.transition', false, asFlag);
@@ -30,9 +33,7 @@ export function ScenePanel() {
     api
       .episodes()
       .then((e) => {
-        if (!live) return;
-        setEpisodes(e);
-        setEpisode((cur) => cur || (e[0]?.id ?? ''));
+        if (live) setEpisodes(e);
       })
       .catch(() => undefined);
     return () => {
@@ -40,7 +41,7 @@ export function ScenePanel() {
     };
   }, [api, setPack]);
 
-  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episode, pack, sweepTransition, shader })));
+  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, pack, sweepTransition, shader })));
 
   return (
     <section className={ui.section}>
@@ -131,23 +132,63 @@ export function ScenePanel() {
         <a href={recapUrl(party.joinUrl)} target="_blank" rel="noreferrer">
           recap pro hosty ↗
         </a>
-        <label>
-          epizoda
-          <select
-            value={episode}
-            onChange={(e) => {
-              setEpisode(e.target.value);
-            }}
-          >
-            {episodes.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.title}
-              </option>
-            ))}
-            <option value="party">🎉 Party epizoda (z galerie)</option>
-          </select>
-        </label>
       </div>
+      <details className={ui.episodes}>
+        <summary>
+          📖 Webtoon: {wtEpisodes.length ? `${String(wtEpisodes.length)} ${plural(wtEpisodes.length, 'sloupec', 'sloupce', 'sloupců')}` : 'první epizoda'}
+        </summary>
+        <div className={cx(ui.row, ui.small)}>
+          <label>
+            jazyk bublin
+            <select
+              value={wtLang}
+              onChange={(e) => {
+                setWtLang(e.target.value);
+              }}
+            >
+              {WEBTOON_LANGS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            rychlost{' '}
+            <input
+              type="number"
+              min={10}
+              max={400}
+              step={10}
+              value={wtSpeed}
+              onChange={(e) => {
+                setWtSpeed(e.target.valueAsNumber || 60);
+              }}
+            />{' '}
+            px/s
+          </label>
+          <a href={`/studio/${party.code}`} target="_blank" rel="noreferrer">
+            stáhnout další ve Studiu ↗
+          </a>
+        </div>
+        <div className={ui.eplist}>
+          {[{ id: 'party', label: '🎉 Party epizoda (z galerie)' }, ...episodes.map((e) => ({ id: e.id, label: `${e.story ? `${e.story} · ` : ''}${e.title} (${String(e.n)})` }))].map((e) => (
+            <label key={e.id}>
+              <input
+                type="checkbox"
+                checked={wtEpisodes.includes(e.id)}
+                onChange={() => {
+                  setWtEpisodes((cur) => toggledEpisode(cur, e.id));
+                }}
+              />{' '}
+              {e.label}
+            </label>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }
+
+const episodeList = asJson<string[]>();
+const speedCodec = { parse: (raw: string) => Number(raw) || 60, serialize: (v: number) => String(v) };

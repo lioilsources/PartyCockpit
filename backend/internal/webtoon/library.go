@@ -259,9 +259,13 @@ func (l *Library) addPack(dir string) {
 			if raw.SourceLanguage != "" && !slices.Contains(langs, raw.SourceLanguage) {
 				langs = append([]string{raw.SourceLanguage}, langs...)
 			}
+			story := title
+			if raw.Title != "" { // gamebook stories are titled "<book> — <episode>"
+				story = strings.TrimSuffix(story, " — "+raw.Title)
+			}
 			e := &entry{
 				media: filepath.Join(root, "media", id),
-				ep: Episode{ID: id, Title: raw.Title, Story: title, StoryID: st.ID, Index: raw.Index, Langs: langs,
+				ep: Episode{ID: id, Title: raw.Title, Story: story, StoryID: st.ID, Index: raw.Index, Langs: langs,
 					Audience: aud, Source: "pack", Pack: dir},
 			}
 			if st.Cover != "" && SafeName.MatchString(filepath.Base(st.Cover)) {
