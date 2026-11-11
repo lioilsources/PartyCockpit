@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { ShowQueue } from '../../lib/showqueue';
+  import { rng } from '../../lib/rand';
   import type { BeatClock } from '../../lib/beat';
   import type { Asset } from '../../lib/types';
   import Handwritten from '../../lib/Handwritten.svelte';
@@ -8,13 +9,13 @@
   // Sticker Wall: guests' messages as handwritten notes. With a glyph sheet
   // (meta.sheet, D16) the note is drawn from HandWrittenStickers letters, else in
   // the Caveat font (D11).
-  let { queue, loopMode, clock }: { queue: Asset[]; loopMode: 'loop' | 'shuffle'; clock: BeatClock } = $props();
+  let { queue, loopMode, clock, params = {} }: { queue: Asset[]; loopMode: 'loop' | 'shuffle'; clock: BeatClock; params?: Record<string, any> } = $props();
 
   // note content box ≈ 11.6vw wide, letters ≈ 3.2vw tall; drawn 2× for the focus zoom
   const vw = innerWidth / 100;
 
   const notes = $derived(queue.filter((a) => a.kind === 'sticker').slice(-24));
-  const picker = new ShowQueue<Asset>();
+  const picker = new ShowQueue<Asset>(rng(params.seed, 8));
   let focus = $state<string>('');
   let count = 0;
 

@@ -276,7 +276,7 @@ func (s *Server) uploadPhoto(w http.ResponseWriter, r *http.Request, p store.Par
 		return
 	}
 	medium := r.FormValue("medium")
-	a, err := s.submitRestyle(ctx, p, g, raw, style, medium)
+	a, err := s.submitRestyle(ctx, p, g, raw, style, medium, nil)
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -554,6 +554,7 @@ func (s *Server) panic(w http.ResponseWriter, r *http.Request, p store.Party) {
 		return
 	}
 	s.unliveAll(p.Code)
+	s.showPause(p.Code)
 	s.stopMic(p.Code)
 	s.endGame(p.Code)
 	s.Hub.Broadcast(p.Code, hub.Msg{Type: "panic", Data: nil})

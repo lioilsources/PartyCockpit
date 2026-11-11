@@ -64,6 +64,12 @@ export type Asset = {
   createdAt: number;
 };
 
+/** One scene of a Studio show (D23); its items live in params (episodes, packs, assets, images). */
+export type ShowEntry = { id: string; kind: SceneKind; title: string; params: Record<string, any>; seconds: number };
+export type Show = { name: string; entries: ShowEntry[]; loop: boolean; updatedAt: number };
+/** The show with its player state (backend api/show.go ShowState). */
+export type ShowState = Show & { playing: boolean; index: number; entryId: string; startedAt: number; endsAt: number };
+
 export type Guest = { id: string; nickname: string; wantsToPlay: boolean; createdAt: number };
 export type Idea = { id: string; guestId: string; nickname: string; text: string; createdAt: number };
 

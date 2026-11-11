@@ -85,4 +85,14 @@ CREATE TABLE ideas (
 UPDATE parties SET stage_key = lower(hex(randomblob(16))) WHERE stage_key = '';`,
 	// 4 — /files looks an asset up by its file to check its status (D19)
 	`CREATE INDEX assets_file ON assets(party_code, file);`,
+	// 5 — Scene Studio (D23): the party's show (scenes with their items, played in
+	// order) and the hidden "Studio" guest that owns the operator's own photos
+	`CREATE TABLE shows (
+  party_code TEXT PRIMARY KEY REFERENCES parties(code) ON DELETE CASCADE,
+  name       TEXT NOT NULL DEFAULT '',
+  entries    TEXT NOT NULL DEFAULT '[]',
+  loop       INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
+ALTER TABLE guests ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;`,
 }

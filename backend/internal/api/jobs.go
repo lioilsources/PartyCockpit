@@ -22,7 +22,7 @@ type jobTask struct {
 
 // submitRestyle stores the original (status "source", never on stage), creates
 // the restyle asset in "processing" and queues the GPU job.
-func (s *Server) submitRestyle(ctx context.Context, p store.Party, g store.Guest, raw []byte, style providers.Style, medium string) (store.Asset, error) {
+func (s *Server) submitRestyle(ctx context.Context, p store.Party, g store.Guest, raw []byte, style providers.Style, medium string, extra map[string]any) (store.Asset, error) {
 	photo, w, h, err := providers.Normalise(raw)
 	if err != nil {
 		return store.Asset{}, fmt.Errorf("fotku se nepodařilo načíst: %w", err)
@@ -37,8 +37,12 @@ func (s *Server) submitRestyle(ctx context.Context, p store.Party, g store.Guest
 		return store.Asset{}, err
 	}
 	medium = providers.NormMedium(medium)
-	meta, _ := json.Marshal(map[string]any{"style": style.ID, "styleLabel": style.Label, "medium": medium,
-		"nickname": g.Nickname, "original": srcFile, "w": w, "h": h})
+	m := map[string]any{"style": style.ID, "styleLabel": style.Label, "medium": medium,
+		"nickname": g.Nickname, "original": srcFile, "w": w, "h": h}
+	for k, v := range extra {
+		m[k] = v
+	}
+	meta, _ := json.Marshal(m)
 	if _, err := s.Store.CreateAsset(ctx, store.Asset{ID: srcID, PartyCode: p.Code, GuestID: g.ID, Kind: "upload", File: srcFile, Meta: meta, Status: "source"}); err != nil {
 		return store.Asset{}, err
 	}
@@ -95,7 +99,8 @@ func (s *Server) runJob(t jobTask) {
 }
 
 // finishAsset classifies the result and moves it to pending — or straight to the
-// show queue in relaxed mode when the classifier is confident (D5).
+// show queue in relaxed mode when the classifier is confident (D5), or when
+// the operator uploaded it in the Studio (D23).
 // The original photo (fallback) never auto-approves.
 func (s *Server) finishAsset(ctx context.Context, code, assetID, file string, img []byte, meta json.RawMessage, allowAuto bool) {
 	score, err := s.Classifier.NSFW(ctx, img)
@@ -111,7 +116,7 @@ func (s *Server) finishAsset(ctx context.Context, code, assetID, file string, im
 	if err != nil {
 		return
 	}
-	if allowAuto && p.Mode == "relaxed" && score >= 0 && score <= s.Cfg.AutoApproveMax {
+	if allowAuto && (s.isStudioAsset(ctx, assetID) || (p.Mode == "relaxed" && score >= 0 && score <= s.Cfg.AutoApproveMax)) {
 		if err := s.Store.SetAssetStatus(ctx, code, assetID, "approved"); err == nil {
 			s.pushQueue(ctx, code)
 			s.onApproved(ctx, p, assetID)

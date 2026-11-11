@@ -76,20 +76,11 @@ func (c *Client) StyleMapCached(rel string) bool {
 	return err == nil
 }
 
-// PrefetchPack downloads a whole upstream pack into the cache (map, atlas and
-// every thumb), so a show plays it without the uplink. It returns how many
-// files are still missing.
-func (c *Client) PrefetchPack(ctx context.Context, id string) (int, error) {
-	if !StyleMapPath.MatchString(id + "/map.json") {
-		return 0, errors.New("bad pack id")
-	}
-	path, err := c.cachedStyleMap(ctx, id+"/map.json")
+// packFiles lists every file of an upstream pack from its cached map.json.
+func (c *Client) packFiles(id string) ([]string, error) {
+	b, err := os.ReadFile(filepath.Join(c.CacheDir, "stylemaps", id, "map.json"))
 	if err != nil {
-		return 0, err
-	}
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	var m struct {
 		Atlas  string `json:"atlas"`
@@ -99,12 +90,45 @@ func (c *Client) PrefetchPack(ctx context.Context, id string) (int, error) {
 		} `json:"images"`
 	}
 	if err := json.Unmarshal(b, &m); err != nil {
-		return 0, err
+		return nil, err
 	}
-	rels := []string{id + "/" + cmp.Or(m.Atlas, "atlas.webp")}
+	rels := []string{id + "/map.json", id + "/" + cmp.Or(m.Atlas, "atlas.webp")}
 	tpl := cmp.Or(m.Thumbs, "t/{i}.webp")
 	for _, im := range m.Images {
 		rels = append(rels, id+"/"+strings.ReplaceAll(tpl, "{i}", strconv.Itoa(im.I)))
+	}
+	return rels, nil
+}
+
+// PackMissing counts the files of an upstream pack that are not in the cache
+// (no network); an uncached map.json is an error.
+func (c *Client) PackMissing(id string) (int, error) {
+	rels, err := c.packFiles(id)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, rel := range rels {
+		if !StyleMapPath.MatchString(rel) || !c.StyleMapCached(rel) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// PrefetchPack downloads a whole upstream pack into the cache (map, atlas and
+// every thumb), so a show plays it without the uplink. It returns how many
+// files are still missing.
+func (c *Client) PrefetchPack(ctx context.Context, id string) (int, error) {
+	if !StyleMapPath.MatchString(id + "/map.json") {
+		return 0, errors.New("bad pack id")
+	}
+	if _, err := c.cachedStyleMap(ctx, id+"/map.json"); err != nil {
+		return 0, err
+	}
+	rels, err := c.packFiles(id)
+	if err != nil {
+		return 0, err
 	}
 	missing := 0
 	for _, rel := range rels {

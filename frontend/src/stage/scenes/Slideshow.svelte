@@ -2,10 +2,13 @@
   import { onDestroy } from 'svelte';
   import { api, store } from '../../lib/api';
   import { shuffle } from '../../lib/showqueue';
+  import { rng } from '../../lib/rand';
   import type { BeatClock } from '../../lib/beat';
   import type { GalleryImage } from '../../lib/types';
 
   // FineTuneGallery slideshow; switches every `beats` beats (≈ 8 s idle), Ken Burns.
+  // A Studio show (D23) names its images (params.images: sha256 in order, from
+  // the disk cache, no gallery call) and fixes the shuffle with params.seed.
   let { params, clock }: { params: Record<string, any>; clock: BeatClock } = $props();
 
   const beats = $derived(Math.max(2, Number(params.beats) || 8));
@@ -17,16 +20,22 @@
   let err = $state('');
 
   async function load() {
+    const picked: string[] = Array.isArray(params.images) ? params.images.filter((x: unknown) => typeof x === 'string' && /^[0-9a-f]{64}$/.test(x)) : [];
+    if (picked.length) {
+      images = picked.map((sha, i) => ({ id: i, sha256: sha, prompt: '', styleId: '', url: `/api/gallery/img/${sha}`, thumb: `/api/gallery/thumb/${sha}` }));
+      advance();
+      return;
+    }
     const q = new URLSearchParams({ limit: '150' });
     if (params.style) q.set('style', params.style);
     if (params.score) q.set('score', String(params.score));
     const ck = `pc.gallery.${q}`;
     try {
-      images = shuffle(await api.get<GalleryImage[]>(`/api/gallery?${q}`));
+      images = shuffle(await api.get<GalleryImage[]>(`/api/gallery?${q}`), rng(params.seed, 5));
       store.set(ck, JSON.stringify(images));
       err = images.length ? '' : 'Galerie nevrátila žádné SFW obrázky';
     } catch (e: any) {
-      images = JSON.parse(store.get(ck) ?? '[]');
+      images = shuffle(JSON.parse(store.get(ck) ?? '[]'), rng(params.seed, 5));
       err = images.length ? '' : e.message;
     }
     advance();

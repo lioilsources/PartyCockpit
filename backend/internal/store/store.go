@@ -190,14 +190,14 @@ func (s *Store) SetCockpitToken(ctx context.Context, code, token string) error {
 // GuestCount is the number of guests that joined the party.
 func (s *Store) GuestCount(ctx context.Context, code string) (int, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ?", code).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ? AND hidden = 0", code).Scan(&n)
 	return n, err
 }
 
 // NicknameTaken reports whether another guest of the party uses the nickname (any case).
 func (s *Store) NicknameTaken(ctx context.Context, code, nick string) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ? AND lower(nickname) = lower(?)", code, nick).Scan(&n)
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM guests WHERE party_code = ? AND hidden = 0 AND lower(nickname) = lower(?)", code, nick).Scan(&n)
 	return n > 0, err
 }
 
@@ -273,6 +273,23 @@ func (s *Store) CreateGuest(ctx context.Context, code, nickname string) (Guest, 
 	return g, err
 }
 
+// StudioGuest returns the party's hidden guest that owns the operator's own
+// photos from the Studio (D23); it is never listed, counted or drawn.
+func (s *Store) StudioGuest(ctx context.Context, code string) (Guest, error) {
+	var g Guest
+	err := s.db.QueryRowContext(ctx, "SELECT id, party_code, nickname, wants_to_play, created_at FROM guests WHERE party_code = ? AND hidden = 1 LIMIT 1", code).
+		Scan(&g.ID, &g.PartyCode, &g.Nickname, &g.WantsToPlay, &g.CreatedAt)
+	if err == nil {
+		return g, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return g, err
+	}
+	g = Guest{ID: "pc" + NewID(8), PartyCode: code, Nickname: "Studio", CreatedAt: s.Now().UnixMilli()}
+	_, err = s.db.ExecContext(ctx, "INSERT INTO guests(id, party_code, nickname, created_at, hidden) VALUES(?,?,?,?,1)", g.ID, g.PartyCode, g.Nickname, g.CreatedAt)
+	return g, err
+}
+
 func (s *Store) Guest(ctx context.Context, code, id string) (Guest, error) {
 	var g Guest
 	err := s.db.QueryRowContext(ctx, "SELECT id, party_code, nickname, wants_to_play, created_at FROM guests WHERE id = ? AND party_code = ?", id, code).
@@ -284,7 +301,7 @@ func (s *Store) Guest(ctx context.Context, code, id string) (Guest, error) {
 }
 
 func (s *Store) Guests(ctx context.Context, code string) ([]Guest, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, party_code, nickname, wants_to_play, created_at FROM guests WHERE party_code = ? ORDER BY created_at", code)
+	rows, err := s.db.QueryContext(ctx, "SELECT id, party_code, nickname, wants_to_play, created_at FROM guests WHERE party_code = ? AND hidden = 0 ORDER BY created_at", code)
 	if err != nil {
 		return nil, err
 	}
@@ -665,4 +682,58 @@ func (s *Store) Ideas(ctx context.Context, code string) ([]Idea, error) {
 		out = append(out, i)
 	}
 	return out, rows.Err()
+}
+
+// ── show (Scene Studio, D23) ─────────────────────────────────────────────
+
+// ShowEntry is one scene of the show: its kind and parameters (the items it
+// plays are in the parameters: episodes, packs, assets, images) and how long
+// it runs.
+type ShowEntry struct {
+	ID      string          `json:"id"`
+	Kind    string          `json:"kind"`
+	Title   string          `json:"title"`
+	Params  json.RawMessage `json:"params"`
+	Seconds int             `json:"seconds"`
+}
+
+type Show struct {
+	Name      string      `json:"name"`
+	Entries   []ShowEntry `json:"entries"`
+	Loop      bool        `json:"loop"`
+	UpdatedAt int64       `json:"updatedAt"`
+}
+
+func (s *Store) Show(ctx context.Context, code string) (Show, error) {
+	var sh Show
+	var entries string
+	err := s.db.QueryRowContext(ctx, "SELECT name, entries, loop, updated_at FROM shows WHERE party_code = ?", code).Scan(&sh.Name, &entries, &sh.Loop, &sh.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Show{Entries: []ShowEntry{}, Loop: true}, nil
+	}
+	if err != nil {
+		return sh, err
+	}
+	if err := json.Unmarshal([]byte(entries), &sh.Entries); err != nil {
+		return sh, fmt.Errorf("show entries: %w", err)
+	}
+	if sh.Entries == nil {
+		sh.Entries = []ShowEntry{}
+	}
+	return sh, nil
+}
+
+func (s *Store) SaveShow(ctx context.Context, code string, sh Show) (Show, error) {
+	if sh.Entries == nil {
+		sh.Entries = []ShowEntry{}
+	}
+	b, err := json.Marshal(sh.Entries)
+	if err != nil {
+		return sh, err
+	}
+	sh.UpdatedAt = s.Now().UnixMilli()
+	_, err = s.db.ExecContext(ctx, `INSERT INTO shows(party_code, name, entries, loop, updated_at) VALUES(?,?,?,?,?)
+		ON CONFLICT(party_code) DO UPDATE SET name = excluded.name, entries = excluded.entries, loop = excluded.loop, updated_at = excluded.updated_at`,
+		code, sh.Name, string(b), sh.Loop, sh.UpdatedAt)
+	return sh, err
 }

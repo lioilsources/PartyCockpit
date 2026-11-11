@@ -69,6 +69,10 @@ type Server struct {
 	pmu       sync.Mutex
 	pairUntil map[string]time.Time // party → the box shows the pairing QR until (D20)
 
+	shmu     sync.Mutex
+	showRuns map[string]*showRun // party → Studio show player (D23)
+	showUnit time.Duration       // one show "second" (tests shorten it)
+
 	bmu    sync.Mutex
 	smJobs map[string]*smJob // session/prompt key → StyleMap build (D23)
 	smBusy bool
@@ -96,6 +100,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.gameInputs = newLimiter(time.Now, 30, 30)
 	s.draws, s.games = map[string][]string{}, map[string]*game{}
 	s.smJobs = map[string]*smJob{}
+	s.showRuns = map[string]*showRun{}
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
@@ -180,6 +185,20 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /api/parties/{code}/subtitle", s.cockpit(s.clearSubtitles))
 	mux.HandleFunc("GET /ws/parties/{code}/mic", s.party(s.micAuth))
 	mux.HandleFunc("POST /api/parties/{code}/animate", s.cockpit(s.animateGallery))
+	// Scene Studio (D23)
+	mux.HandleFunc("GET /api/parties/{code}/show", s.cockpit(s.getShow))
+	mux.HandleFunc("PUT /api/parties/{code}/show", s.cockpit(s.putShow))
+	mux.HandleFunc("POST /api/parties/{code}/show/play", s.cockpit(s.showControl("play")))
+	mux.HandleFunc("POST /api/parties/{code}/show/pause", s.cockpit(s.showControl("pause")))
+	mux.HandleFunc("POST /api/parties/{code}/show/next", s.cockpit(s.showControl("next")))
+	mux.HandleFunc("POST /api/parties/{code}/show/prev", s.cockpit(s.showControl("prev")))
+	mux.HandleFunc("GET /api/parties/{code}/show/ready", s.cockpit(s.showReady))
+	mux.HandleFunc("POST /api/parties/{code}/show/prefetch", s.cockpit(s.showPrefetch))
+	mux.HandleFunc("POST /api/parties/{code}/studio/photos", s.cockpit(s.studioPhoto))
+	mux.HandleFunc("GET /api/parties/{code}/shows", s.cockpit(s.listShows))
+	mux.HandleFunc("POST /api/parties/{code}/shows", s.cockpit(s.saveShow))
+	mux.HandleFunc("POST /api/parties/{code}/shows/{slug}/load", s.cockpit(s.loadShow))
+	mux.HandleFunc("DELETE /api/parties/{code}/shows/{slug}", s.cockpit(s.deleteShow))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/approve", s.cockpit(s.streamStatus("live")))
 	mux.HandleFunc("POST /api/parties/{code}/streams/{sid}/hold", s.cockpit(s.streamStatus("pending")))
 	mux.HandleFunc("DELETE /api/parties/{code}/streams/{sid}", s.cockpit(s.kickStream))
@@ -229,12 +248,20 @@ func securityHeaders(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; " +
 		"img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; " +
 		"font-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'none'"
+	// the Studio previews a scene in an <iframe> of the stage (D23): only the
+	// stage page may be framed, and only by this origin
+	stageCSP := strings.Replace(csp, "frame-ancestors 'none'", "frame-ancestors 'self'", 1)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Content-Security-Policy-Report-Only", csp)
+		if strings.HasPrefix(r.URL.Path, "/stage/") {
+			h.Set("X-Frame-Options", "SAMEORIGIN")
+			h.Set("Content-Security-Policy-Report-Only", stageCSP)
+		} else {
+			h.Set("X-Frame-Options", "DENY")
+			h.Set("Content-Security-Policy-Report-Only", csp)
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -450,6 +477,11 @@ func (s *Server) helloFor(r *http.Request, p store.Party, role hub.Role) ([]hub.
 		msgs = append(msgs, hub.Msg{Type: "music", Data: snap})
 	}
 	msgs = append(msgs, hub.Msg{Type: "tempo", Data: s.currentTempo(p.Code)})
+	if role == hub.Stage || role == hub.Cockpit {
+		if sh, err := s.showState(ctx, p.Code); err == nil {
+			msgs = append(msgs, hub.Msg{Type: "show", Data: sh})
+		}
+	}
 	if role == hub.Cockpit {
 		st, err := s.cockpitPayload(ctx, p)
 		if err != nil {
