@@ -10,6 +10,7 @@ export type SceneParams = {
   speed?: number;
   cols?: number;
   pack?: string;
+  packs?: string[];
   transition?: string;
   shader?: string;
 };

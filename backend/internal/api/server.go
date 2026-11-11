@@ -69,6 +69,10 @@ type Server struct {
 	pmu       sync.Mutex
 	pairUntil map[string]time.Time // party → the box shows the pairing QR until (D20)
 
+	bmu    sync.Mutex
+	smJobs map[string]*smJob // session/prompt key → StyleMap build (D23)
+	smBusy bool
+
 	gmu   sync.Mutex
 	draws map[string][]string // party → guest ids of the last lottery draw
 	games map[string]*game    // party → the intermission game in progress
@@ -91,6 +95,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.limits = newLimiter(func() time.Time { return s.Store.Now() }, writeRate, writeBurst)
 	s.gameInputs = newLimiter(time.Now, 30, 30)
 	s.draws, s.games = map[string][]string{}, map[string]*game{}
+	s.smJobs = map[string]*smJob{}
 	s.jobs = make(chan jobTask, 256)
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
@@ -186,7 +191,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/gallery/{kind}/{sha}", func(w http.ResponseWriter, r *http.Request) {
 		s.Gallery.ServeFile(w, r, r.PathValue("kind"), r.PathValue("sha"))
 	})
-	mux.HandleFunc("GET /stylemaps/{rel...}", func(w http.ResponseWriter, r *http.Request) { s.Gallery.ServeStyleMap(w, r, r.PathValue("rel")) })
+	mux.HandleFunc("GET /stylemaps/{rel...}", s.serveStyleMaps)
+	mux.HandleFunc("GET /api/parties/{code}/finetune/sessions", s.cockpit(s.finetuneSessions))
+	mux.HandleFunc("GET /api/parties/{code}/finetune/sessions/{id}/groups", s.cockpit(s.finetuneGroups))
+	mux.HandleFunc("POST /api/parties/{code}/stylemaps/build", s.cockpit(s.buildStyleMaps))
+	mux.HandleFunc("DELETE /api/parties/{code}/stylemaps/{id}", s.cockpit(s.deleteStyleMap))
 	mux.HandleFunc("GET /api/glyphs", func(w http.ResponseWriter, r *http.Request) {
 		if s.Glyphs == nil {
 			writeJSON(w, 200, []glyphs.Sheet{})

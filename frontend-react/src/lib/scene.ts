@@ -36,6 +36,8 @@ export type SceneOptions = {
   /** Pásy (D23): 2–5 columns. */
   stripCols: number;
   pack: string;
+  /** StyleMap tiles (D23), up to 9; empty = `pack` alone. */
+  sweepPacks: string[];
   sweepTransition: boolean;
   shader: string;
 };
@@ -43,8 +45,11 @@ export type SceneOptions = {
 /** Bubble languages offered for webtoon packs. */
 export const WEBTOON_LANGS = ['cs', 'en', 'de', 'fr', 'it', 'pl', 'uk'] as const;
 
-/** Toggles an episode column; the oldest drops out past 4 (as in Svelte). */
-export const toggledEpisode = (list: readonly string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-4));
+/** Toggles an item of a capped list; the oldest drops out (as in Svelte). */
+export const toggled = (list: readonly string[], id: string, cap: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id].slice(-cap));
+
+/** Webtoon columns: at most 4. */
+export const toggledEpisode = (list: readonly string[], id: string) => toggled(list, id, 4);
 
 /** Scene parameters exactly as the Svelte Cockpit sends them. */
 export function sceneParams(kind: SceneKind, o: SceneOptions): SceneParams {
@@ -56,7 +61,10 @@ export function sceneParams(kind: SceneKind, o: SceneOptions): SceneParams {
     params.lang = o.wtLang;
     params.speed = o.wtSpeed;
   }
-  if (kind === 'stylesweep' && o.pack) params.pack = o.pack;
+  if (kind === 'stylesweep' && o.sweepPacks.length) {
+    params.packs = [...o.sweepPacks];
+    params.pack = o.sweepPacks[0];
+  } else if (kind === 'stylesweep' && o.pack) params.pack = o.pack;
   else if (o.sweepTransition && o.pack) params.transition = o.pack;
   if (kind === 'interlude') {
     params.beats = Math.max(o.beats, 16);

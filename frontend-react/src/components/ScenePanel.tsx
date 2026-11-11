@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { listPacks, type PackInfo } from '@pc/lib/stylemap';
 import { plural, recapUrl, type Episode, type SceneKind } from '@pc/lib/types';
 import { useCockpit } from '../CockpitContext';
-import { SCENES, SHADERS, WEBTOON_LANGS, sceneParams, toggledEpisode } from '../lib/scene';
+import { SCENES, SHADERS, WEBTOON_LANGS, sceneParams, toggled, toggledEpisode } from '../lib/scene';
 import { asFlag, asJson, asString, useStoredState } from '../hooks/useStoredState';
 import { cx } from '../lib/format';
 import ui from './ui.module.css';
@@ -21,6 +21,7 @@ export function ScenePanel() {
   const [packs, setPacks] = useState<PackInfo[]>([]);
   const [pack, setPack] = useStoredState('pc.stylemap', '', asString);
   const [sweepTransition, setSweepTransition] = useStoredState('pc.stylemap.transition', false, asFlag);
+  const [sweepPacks, setSweepPacks] = useStoredState<string[]>('pc.stylemap.packs', [], episodeList);
 
   useEffect(() => {
     let live = true;
@@ -42,7 +43,7 @@ export function ScenePanel() {
     };
   }, [api, setPack]);
 
-  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, stripCols, pack, sweepTransition, shader })));
+  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, stripCols, pack, sweepPacks, sweepTransition, shader })));
 
   return (
     <section className={ui.section}>
@@ -143,10 +144,33 @@ export function ScenePanel() {
             </label>
           </>
         )}
+        <a href={`/studio/${party.code}`} target="_blank" rel="noreferrer">
+          StyleMap ze session ve Studiu ↗
+        </a>
         <a href={recapUrl(party.joinUrl)} target="_blank" rel="noreferrer">
           recap pro hosty ↗
         </a>
       </div>
+      {packs.length > 1 && (
+        <details className={ui.episodes}>
+          <summary>🎨 StyleMap dlaždice: {sweepPacks.length ? `${String(sweepPacks.length)} naráz` : 'jen jeden pack'}</summary>
+          <div className={ui.eplist}>
+            {packs.map((x) => (
+              <label key={x.id}>
+                <input
+                  type="checkbox"
+                  checked={sweepPacks.includes(x.id)}
+                  onChange={() => {
+                    setSweepPacks((cur) => toggled(cur, x.id, 9));
+                  }}
+                />{' '}
+                {x.title} ({x.n}
+                {x.source === 'party' ? ', lokální' : ''})
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
       <details className={ui.episodes}>
         <summary>
           📖 Webtoon: {wtEpisodes.length ? `${String(wtEpisodes.length)} ${plural(wtEpisodes.length, 'sloupec', 'sloupce', 'sloupců')}` : 'první epizoda'}

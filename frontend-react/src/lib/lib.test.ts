@@ -5,7 +5,7 @@ import { ago, cx, extendedEnd } from './format';
 import { moved } from './queue';
 import { sceneParams, toggledEpisode } from './scene';
 
-const opts = { beats: 8, slideStyle: '', episodes: [] as string[], wtLang: 'cs', wtSpeed: 60, stripCols: 3, pack: '', sweepTransition: false, shader: '' };
+const opts = { beats: 8, slideStyle: '', episodes: [] as string[], wtLang: 'cs', wtSpeed: 60, stripCols: 3, pack: '', sweepPacks: [] as string[], sweepTransition: false, shader: '' };
 
 describe('sceneParams', () => {
   it('matches what the Svelte Cockpit sends', () => {
@@ -16,6 +16,7 @@ describe('sceneParams', () => {
     expect(sceneParams('webtoon', { ...opts, episodes: ['party', 'ep_1'], wtLang: 'en' })).toEqual({ beats: 8, episodes: ['party', 'ep_1'], lang: 'en', speed: 60 });
     expect(sceneParams('webtoon', opts)).toEqual({ beats: 8, lang: 'cs', speed: 60 });
     expect(sceneParams('strips', { ...opts, stripCols: 4 })).toEqual({ beats: 8, cols: 4 });
+    expect(sceneParams('stylesweep', { ...opts, pack: 'cat', sweepPacks: ['a', 'b'] })).toEqual({ beats: 8, pack: 'a', packs: ['a', 'b'] });
   });
 
   it('keeps at most 4 webtoon columns', () => {
