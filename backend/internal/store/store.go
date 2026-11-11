@@ -318,7 +318,8 @@ type Asset struct {
 	NSFWScore float64         `json:"nsfwScore"`
 	Status    string          `json:"status"`
 	CreatedAt int64           `json:"createdAt"`
-	// Live is the approved LivePortrait loop of this photo; StageQueue only.
+	// Live is the approved clip that plays in place of this photo (a breeze clip
+	// before a LivePortrait loop); StageQueue only.
 	Live string `json:"live,omitempty"`
 }
 
@@ -432,8 +433,8 @@ func (s *Store) SetAssetStatus(ctx context.Context, code, id, status string) err
 	if err := tx.QueryRowContext(ctx, "SELECT kind FROM assets WHERE id = ?", id).Scan(&kind); err != nil {
 		return err
 	}
-	// a live loop is shown in place of its photo, never as its own queue item
-	if status == "approved" && kind != "live" {
+	// a live loop or a breeze clip is shown in place of its photo, never as its own queue item
+	if status == "approved" && kind != "live" && kind != "breeze" {
 		_, err = tx.ExecContext(ctx, `INSERT OR IGNORE INTO stage_queue(asset_id, party_code, position)
 			VALUES(?, ?, COALESCE((SELECT MAX(position) FROM stage_queue WHERE party_code = ?), 0) + 1)`, id, code, code)
 	} else {
@@ -449,8 +450,8 @@ func (s *Store) SetAssetStatus(ctx context.Context, code, id, status string) err
 
 func (s *Store) StageQueue(ctx context.Context, code string) ([]Asset, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT a."+strings.ReplaceAll(assetCols, ", ", ", a.")+`,
-		COALESCE((SELECT l.file FROM assets l WHERE l.src_id = a.id AND l.kind = 'live' AND l.status = 'approved'
-		          ORDER BY l.created_at DESC LIMIT 1), '')
+		COALESCE((SELECT l.file FROM assets l WHERE l.src_id = a.id AND l.kind IN ('breeze', 'live') AND l.status = 'approved'
+		          ORDER BY l.kind = 'breeze' DESC, l.created_at DESC LIMIT 1), '')
 		FROM stage_queue q JOIN assets a ON a.id = q.asset_id WHERE q.party_code = ? ORDER BY q.position`, code)
 	if err != nil {
 		return nil, err

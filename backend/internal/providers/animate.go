@@ -5,6 +5,7 @@ package providers
 //	live  — LivePortrait retargets face motion from a driver clip onto the photo
 //	        (blink, look around, smile). Seconds of GPU; only the face moves.
 //	dance — Wan 2.2 image-to-video with a dance prompt. Minutes of GPU; generative.
+//	breeze — the same Wan graph with a hair-in-the-breeze prompt (D23).
 //
 // Providers: Comfy (a ComfyUI host, e.g. the L40S), RestylerAnimator (Restyler
 // /api/render live_portrait step, once Restyler ships it) and MockAnimator
@@ -40,7 +41,7 @@ import (
 type Motion struct {
 	ID      string  `json:"id"`
 	Label   string  `json:"label"`
-	Engine  string  `json:"engine"` // live | dance
+	Engine  string  `json:"engine"` // live | dance | breeze
 	Seconds float64 `json:"seconds"`
 	Prompt  string  `json:"-"`
 }
@@ -63,6 +64,12 @@ var Motions = []Motion{
 	{ID: "jump", Label: "🙌 Skákání", Engine: "dance", Seconds: 5,
 		Prompt: "the person jumps up and down to the music with both arms raised, celebrating, " +
 			"full body visible, static camera, same face and outfit"},
+	// hair in the breeze (D23): the prompt of Restyler's hair-breeze preset
+	// (MangaPrompts-restyler assets/drivers/manifest.json). Wan, so generative:
+	// the operator orders and approves it; it then plays in place of the photo.
+	{ID: "breeze", Label: "💨 Vlasy ve větru", Engine: "breeze", Seconds: 5,
+		Prompt: "a gentle breeze moves the person's hair softly, the person stays still and looks at the camera, " +
+			"same face and outfit, static camera, no zoom"},
 }
 
 func MotionByID(id string) (Motion, bool) {
@@ -406,6 +413,25 @@ func (r RestylerAnimator) Animate(ctx context.Context, req AnimateRequest) ([]by
 
 // ── mock ───────────────────────────────────────────────────────────────────
 
+// wave sways the rows of the top 40 % sideways (hair in the wind), the rest stays.
+func wave(src *image.RGBA, ph float64) *image.RGBA {
+	b := src.Bounds()
+	out := image.NewRGBA(b)
+	copy(out.Pix, src.Pix)
+	top := b.Dy() * 4 / 10
+	for y := 0; y < top; y++ {
+		fall := 1 - float64(y)/float64(top)
+		dx := int(6 * fall * math.Sin(ph+float64(y)/9))
+		row := src.Pix[y*src.Stride : y*src.Stride+b.Dx()*4]
+		dst := out.Pix[y*out.Stride : y*out.Stride+b.Dx()*4]
+		for x := 0; x < b.Dx(); x++ {
+			sx := min(max(x-dx, 0), b.Dx()-1)
+			copy(dst[x*4:x*4+4], row[sx*4:sx*4+4])
+		}
+	}
+	return out
+}
+
 // MockAnimator makes an animated GIF from the photo: a slow "breathing" zoom for
 // live, a bounce and sway for dances. Enough to build the stage without a GPU.
 type MockAnimator struct{ Delay time.Duration }
@@ -431,7 +457,13 @@ func (m MockAnimator) Animate(ctx context.Context, req AnimateRequest) ([]byte, 
 	for i := range frames {
 		ph := 2 * math.Pi * float64(i) / float64(frames)
 		var dst image.Rectangle
-		if req.Motion.Engine == "live" {
+		if req.Motion.Engine == "breeze" {
+			p := image.NewPaletted(base.Bounds(), palette.Plan9)
+			xdraw.FloydSteinberg.Draw(p, p.Bounds(), wave(base, ph), image.Point{})
+			out.Image = append(out.Image, p)
+			out.Delay = append(out.Delay, 8)
+			continue
+		} else if req.Motion.Engine == "live" {
 			z := 1 + 0.03*(1-math.Cos(ph))/2 // zoom in and back out
 			dw, dh := int(float64(w)*z), int(float64(h)*z)
 			dst = image.Rect((w-dw)/2, (h-dh)/2, (w-dw)/2+dw, (h-dh)/2+dh)

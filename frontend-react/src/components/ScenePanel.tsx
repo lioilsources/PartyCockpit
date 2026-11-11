@@ -17,6 +17,7 @@ export function ScenePanel() {
   const [wtEpisodes, setWtEpisodes] = useStoredState<string[]>('pc.webtoon.episodes', [], episodeList);
   const [wtLang, setWtLang] = useStoredState('pc.webtoon.lang', 'cs', asString);
   const [wtSpeed, setWtSpeed] = useStoredState('pc.webtoon.speed', 60, speedCodec);
+  const [stripCols, setStripCols] = useStoredState('pc.strips.cols', 3, colsCodec);
   const [packs, setPacks] = useState<PackInfo[]>([]);
   const [pack, setPack] = useStoredState('pc.stylemap', '', asString);
   const [sweepTransition, setSweepTransition] = useStoredState('pc.stylemap.transition', false, asFlag);
@@ -41,7 +42,7 @@ export function ScenePanel() {
     };
   }, [api, setPack]);
 
-  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, pack, sweepTransition, shader })));
+  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, stripCols, pack, sweepTransition, shader })));
 
   return (
     <section className={ui.section}>
@@ -84,6 +85,19 @@ export function ScenePanel() {
               setSlideStyle(e.target.value);
             }}
           />
+        </label>
+        <label>
+          pásy{' '}
+          <input
+            type="number"
+            min={2}
+            max={5}
+            value={stripCols}
+            onChange={(e) => {
+              setStripCols(e.target.valueAsNumber || 3);
+            }}
+          />{' '}
+          sloupce
         </label>
         <label>
           shader
@@ -192,3 +206,4 @@ export function ScenePanel() {
 
 const episodeList = asJson<string[]>();
 const speedCodec = { parse: (raw: string) => Number(raw) || 60, serialize: (v: number) => String(v) };
+const colsCodec = { parse: (raw: string) => Number(raw) || 3, serialize: (v: number) => String(v) };

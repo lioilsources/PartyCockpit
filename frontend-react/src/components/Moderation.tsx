@@ -12,7 +12,7 @@ const MAX_REJECTED = 12;
 function buckets(assets: Asset[]) {
   return {
     pending: assets.filter((a) => a.status === 'pending'),
-    processing: assets.filter((a) => a.status === 'processing' && a.kind !== 'live'),
+    processing: assets.filter((a) => a.status === 'processing' && a.kind !== 'live' && a.kind !== 'breeze'),
     failed: assets.filter((a) => a.status === 'failed'),
     rejected: assets.filter((a) => a.status === 'rejected').slice(0, MAX_REJECTED),
   };

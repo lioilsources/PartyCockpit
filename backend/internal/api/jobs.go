@@ -128,7 +128,7 @@ func (s *Server) fallbackToOriginal(ctx context.Context, assetID, reason string)
 	if err != nil {
 		return
 	}
-	if a.Kind == "live" || a.Kind == "dance" {
+	if a.Kind == "live" || a.Kind == "dance" || a.Kind == "breeze" {
 		s.failAnimation(ctx, assetID, reason)
 		return
 	}

@@ -12,6 +12,7 @@ export const SCENES: readonly { kind: SceneKind; label: string }[] = [
   { kind: 'dance', label: '💃 Tančírna' },
   { kind: 'interlude', label: '🌀 Shader přestávka' },
   { kind: 'stylesweep', label: '🎨 StyleMap' },
+  { kind: 'strips', label: '🎞 Pásy' },
   { kind: 'recap', label: '🎞 Recap (konec)' },
   { kind: 'blank', label: '✨ Mezihra' },
 ];
@@ -32,6 +33,8 @@ export type SceneOptions = {
   episodes: string[];
   wtLang: string;
   wtSpeed: number;
+  /** Pásy (D23): 2–5 columns. */
+  stripCols: number;
   pack: string;
   sweepTransition: boolean;
   shader: string;
@@ -47,6 +50,7 @@ export const toggledEpisode = (list: readonly string[], id: string) => (list.inc
 export function sceneParams(kind: SceneKind, o: SceneOptions): SceneParams {
   const params: SceneParams = { beats: o.beats };
   if (kind === 'slideshow' && o.slideStyle) params.style = o.slideStyle;
+  if (kind === 'strips') params.cols = o.stripCols;
   if (kind === 'webtoon') {
     if (o.episodes.length) params.episodes = [...o.episodes];
     params.lang = o.wtLang;

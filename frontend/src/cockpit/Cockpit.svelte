@@ -173,6 +173,7 @@
     { kind: 'dance', label: '💃 Tančírna' },
     { kind: 'interlude', label: '🌀 Shader přestávka' },
     { kind: 'stylesweep', label: '🎨 StyleMap' },
+    { kind: 'strips', label: '🎞 Pásy' },
     { kind: 'recap', label: '🎞 Recap (konec)' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
@@ -190,6 +191,8 @@
     store.set('pc.stylemap', pack);
     store.set('pc.stylemap.transition', sweepTransition ? '1' : '0');
   });
+  let stripCols = $state(Number(store.get('pc.strips.cols')) || 3);
+  $effect(() => store.set('pc.strips.cols', String(stripCols)));
   let slideStyle = $state('');
   let beats = $state(8);
   let episodes = $state<Episode[]>([]);
@@ -210,6 +213,7 @@
   function setScene(kind: SceneKind) {
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
+    if (kind === 'strips') params.cols = stripCols;
     if (kind === 'webtoon') {
       if (wtEpisodes.length) params.episodes = wtEpisodes;
       params.lang = wtLang;
@@ -266,8 +270,8 @@
 
   // ── moderation
   const pending = $derived((st?.assets ?? []).filter((a) => a.status === 'pending'));
-  const processing = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind !== 'live'));
-  const animating = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind === 'live'));
+  const processing = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind !== 'live' && a.kind !== 'breeze'));
+  const animating = $derived((st?.assets ?? []).filter((a) => a.status === 'processing' && (a.kind === 'live' || a.kind === 'breeze')));
   const failed = $derived((st?.assets ?? []).filter((a) => a.status === 'failed'));
   const rejected = $derived((st?.assets ?? []).filter((a) => a.status === 'rejected').slice(0, 12));
 
@@ -359,6 +363,7 @@
       <div class="row small">
         <label>přepnout každých <input type="number" min="2" max="64" bind:value={beats} /> dob</label>
         <label>styl slideshow <input placeholder="(všechny) styleId" bind:value={slideStyle} /></label>
+        <label>pásy <input type="number" min="2" max="5" bind:value={stripCols} /> sloupce</label>
         <label>shader
           <select bind:value={shader}>
             <option value="">(střídat)</option>
@@ -458,6 +463,7 @@
               <div class="meta">
                 <strong>{a.meta.nickname}</strong>
                 {#if a.kind === 'dance'}<span>💃 tanec {a.meta.motionLabel}</span>{/if}
+                {#if a.kind === 'breeze'}<span>💨 vlasy ve větru (hraje místo fotky)</span>{/if}
                 {#if a.meta.styleLabel}<span>{a.meta.styleLabel}</span>{/if}
                 {#if a.meta.fallback}<span class="warn">originál (restyle selhal)</span>{/if}
                 {#if a.nsfwScore >= 0}<span class:warn={a.nsfwScore > 0.15}>NSFW {a.nsfwScore.toFixed(2)}</span>{/if}
@@ -495,6 +501,7 @@
         <div class="row small">
           <label><input type="checkbox" checked={party.autoLive} onchange={(e) => patch({ autoLive: e.currentTarget.checked })} /> oživovat schválené fotky</label>
           <button onclick={() => act(async () => { const r = await api.post<{ queued: number }>(p('/animate'), {}, token); err = r.queued ? '' : 'všechny fotky už živé jsou (nebo se oživují)'; })}>✨ Oživit galerii</button>
+          <button title="Wan na GPU, asi minuta na fotku; klip čeká na schválení" onclick={() => act(async () => { const r = await api.post<{ queued: number }>(p('/animate'), { motion: 'breeze' }, token); err = r.queued ? '' : 'všechny fotky už vlasy ve větru mají (nebo se dělají)'; })}>💨 Rozfoukat vlasy</button>
           {#if animating.length}<span class="muted">oživuje se {animating.length}</span>{/if}
         </div>
         <div class="row small">

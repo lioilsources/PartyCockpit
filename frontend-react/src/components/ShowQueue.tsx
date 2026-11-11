@@ -14,7 +14,7 @@ function label(a: Asset) {
 export function ShowQueue() {
   const { code, party, st, model, api, act, setErr } = useCockpit();
   const queue = model.queue;
-  const animating = (st?.assets ?? []).filter((a) => a.status === 'processing' && a.kind === 'live').length;
+  const animating = (st?.assets ?? []).filter((a) => a.status === 'processing' && (a.kind === 'live' || a.kind === 'breeze')).length;
 
   const move = (i: number, d: number) => {
     const ids = moved(
@@ -29,6 +29,11 @@ export function ShowQueue() {
       const r = await api.animate();
       if (!r.queued) setErr('všechny fotky už živé jsou (nebo se oživují)');
     });
+  const breezeAll = () =>
+    act(async () => {
+      const r = await api.animate('breeze');
+      if (!r.queued) setErr('všechny fotky už vlasy ve větru mají (nebo se dělají)');
+    });
 
   return (
     <section className={ui.section}>
@@ -38,6 +43,9 @@ export function ShowQueue() {
           <input type="checkbox" checked={party.autoLive} onChange={(e) => act(() => api.patch({ autoLive: e.target.checked }))} /> oživovat schválené fotky
         </label>
         <button onClick={() => void animateAll()}>✨ Oživit galerii</button>
+        <button title="Wan na GPU, asi minuta na fotku; klip čeká na schválení" onClick={() => void breezeAll()}>
+          💨 Rozfoukat vlasy
+        </button>
         {animating > 0 && <span className="muted">oživuje se {animating}</span>}
       </div>
       <div className={cx(ui.row, ui.small)}>
