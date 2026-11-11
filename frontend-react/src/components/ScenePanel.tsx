@@ -6,6 +6,7 @@ import { SCENES, SHADERS, WEBTOON_LANGS, sceneParams, toggled, toggledEpisode } 
 import { asFlag, asJson, asString, useStoredState } from '../hooks/useStoredState';
 import { cx } from '../lib/format';
 import ui from './ui.module.css';
+import { ShowBar } from './ShowBar';
 
 export function ScenePanel() {
   const { party, api, act } = useCockpit();
@@ -50,6 +51,7 @@ export function ScenePanel() {
       <h2 className={ui.h2}>
         Scéna na plátně: <strong>{party.scene.kind}</strong>
       </h2>
+      <ShowBar />
       <div className={ui.row}>
         {SCENES.map((s) => (
           <button

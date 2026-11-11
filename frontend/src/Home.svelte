@@ -32,9 +32,9 @@
   }
 
   // prefix '/react': the second Cockpit implementation (D21), same token
-  function cockpit(p: Party & { cockpitToken: string; stageKey: string }, prefix = '') {
+  function cockpit(p: Party & { cockpitToken: string; stageKey: string }, prefix = '', page = 'cockpit') {
     store.set(`pc.cockpit.${p.code}`, p.cockpitToken);
-    location.href = `${prefix}/cockpit/${p.code}`;
+    location.href = `${prefix}/${page}/${p.code}`;
   }
 
   $effect(() => {
@@ -74,6 +74,7 @@
             <span class="muted">{new Date(p.createdAt).toLocaleString('cs')}</span>
             <button onclick={() => cockpit(p)}>Cockpit</button>
             <button onclick={() => cockpit(p, '/react')}>Cockpit (React)</button>
+            <button onclick={() => cockpit(p, '', 'studio')}>🎬 Studio</button>
             <a href={`/stage/${p.code}?key=${p.stageKey}`} target="_blank">Plátno</a>
           </li>
         {/each}

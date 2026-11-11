@@ -1,5 +1,5 @@
 import { api as http } from '@pc/lib/api';
-import type { Check, CockpitState, Episode, Party, SceneKind } from '@pc/lib/types';
+import type { Check, CockpitState, Episode, Party, SceneKind, ShowState } from '@pc/lib/types';
 
 export type PartyPatch = Partial<Pick<Party, 'mode' | 'loopMode' | 'djfyCode' | 'endsAt' | 'autoLive'>>;
 export type SceneParams = {
@@ -57,6 +57,8 @@ export function cockpitApi(code: string, token: string) {
       return r.text();
     },
     episodes: () => http.get<Episode[]>('/api/webtoon'),
+    /** Studio show player (D23): play from an entry, pause, step. */
+    show: (action: 'play' | 'pause' | 'next' | 'prev', index?: number) => post<ShowState>(`/show/${action}`, index === undefined ? {} : { index }),
   };
 }
 
