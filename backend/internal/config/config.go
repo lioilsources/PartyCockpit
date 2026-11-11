@@ -35,6 +35,10 @@ type Config struct {
 	GalleryURL               string // FINETUNE_URL
 	GalleryAllowUnclassified bool   // FINETUNE_ALLOW_UNCLASSIFIED: show images without a taxonomy band
 
+	// Webtoon reader (D23): Toonfork content catalog and whether adult packs are offered.
+	WebtoonCatalogURL string // WEBTOON_CATALOG_URL
+	WebtoonAllowAdult bool   // WEBTOON_ALLOW_ADULT=1
+
 	// DJfy relay (now playing + shared queue).
 	DJfyURL string // DJFY_URL
 
@@ -99,6 +103,8 @@ func Load() Config {
 		ICEServers:               iceServers(env("PC_ICE_SERVERS", "[]")),
 		GalleryURL:               strings.TrimRight(env("FINETUNE_URL", "https://finetune.ol1n.com"), "/"),
 		GalleryAllowUnclassified: env("FINETUNE_ALLOW_UNCLASSIFIED", "") == "1",
+		WebtoonCatalogURL:        env("WEBTOON_CATALOG_URL", "https://lioilsources.github.io/webtoon-content/catalog.json"),
+		WebtoonAllowAdult:        env("WEBTOON_ALLOW_ADULT", "") == "1",
 		DJfyURL:                  strings.TrimRight(env("DJFY_URL", "https://djfy.ol1n.com"), "/"),
 		RestyleProvider:          env("RESTYLE_PROVIDER", "mock"),
 		RestylerURL:              strings.TrimRight(env("RESTYLER_API_URL", "https://restyler-api.ol1n.com"), "/"),

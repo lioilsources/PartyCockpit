@@ -146,6 +146,13 @@ func (s *Server) preflight(w http.ResponseWriter, r *http.Request, p store.Party
 		add("pending", "Ke schválení", "warn", fmt.Sprintf("%d čeká", len(pending)))
 	}
 
+	// content on disk (D23): what plays without the uplink
+	if n := len(s.Webtoon.List()); n > 0 {
+		add("webtoon", "Webtoon", "info", fmt.Sprintf("%d %s na disku", n, czPlural(n, "epizoda", "epizody", "epizod")))
+	} else {
+		add("webtoon", "Webtoon", "info", "žádná epizoda na disku; stáhni balík ve Studiu (Příprava → Webtoon knihovna)")
+	}
+
 	// party box (D20): certificate and temperature
 	if s.Cfg.Box {
 		if na, err := certNotAfter(s.Cfg.TLSCert); err == nil {
