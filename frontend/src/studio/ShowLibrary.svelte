@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { plural } from '../lib/types';
   import type { StudioApi } from './kinds';
 
   // Saved shows (D23): a prepared show outlives the party. Save copies it with
@@ -10,6 +11,8 @@
   let shows = $state<Saved[]>([]);
   let confirm = $state('');
   let note = $state('');
+  const scenes = (n: number) => `${n} ${plural(n, 'scéna', 'scény', 'scén')}`;
+  const pics = (n: number) => `${n} ${plural(n, 'fotka', 'fotky', 'fotek')}`;
 
   async function load() {
     try {
@@ -23,7 +26,7 @@
   async function save() {
     try {
       const r = await call.post<{ slug: string; assets: number; entries: number }>('/shows', { name });
-      note = `uloženo jako „${r.slug}“ (${r.entries} scén, ${r.assets} fotek)`;
+      note = `uloženo jako „${r.slug}“ (${scenes(r.entries)}, ${pics(r.assets)})`;
       load();
     } catch (e: any) {
       onerror(e.message);
@@ -37,7 +40,7 @@
     confirm = '';
     try {
       const r = await call.post<{ assets: number; entries: number }>(`/shows/${slug}/load`);
-      note = `načteno: ${r.entries} scén, ${r.assets} fotek`;
+      note = `načteno: ${scenes(r.entries)}, ${pics(r.assets)}`;
     } catch (e: any) {
       onerror(e.message);
     }
@@ -66,7 +69,7 @@
   {#each shows as s (s.slug)}
     <li>
       <strong>{s.name}</strong>
-      <span class="muted">{s.entries} scén · {s.assets} fotek · {new Date(s.savedAt).toLocaleString('cs-CZ')}</span>
+      <span class="muted">{scenes(s.entries)} · {pics(s.assets)} · {new Date(s.savedAt).toLocaleString('cs-CZ')}</span>
       <button class:on={confirm === `load:${s.slug}`} onclick={() => loadShow(s.slug)}>{confirm === `load:${s.slug}` ? 'Nahradit současnou show' : 'Načíst'}</button>
       <button class:bad={confirm === `del:${s.slug}`} onclick={() => remove(s.slug)}>{confirm === `del:${s.slug}` ? 'Opravdu smazat' : 'Smazat'}</button>
     </li>

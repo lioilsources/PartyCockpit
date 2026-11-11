@@ -325,3 +325,65 @@ Zadání: `Prompts/03-COCKPIT-REACT.md`.
   certifikát Cloudflare bez vlastního certifikátu na boxu. Potřebuje internet a
   `PC_TRUST_PROXY=1`, jinak mají všichni hosté přes tunel stejnou IP a narazí
   na limity. Bez internetu dál platí certifikát přes DNS (D20).
+
+## D23: Stripy, Pásy, StyleMapy ze session a Scene Studio (2026-11-11)
+Zadání: `Prompts/04-STRIPY-STYLEMAPY-STUDIO.md`, postup: `docs/studio.md`.
+- **Webtoon** bere hotové příběhy z katalogu Toonfork (`WEBTOON_CATALOG_URL`,
+  veřejné GitHub Pages). Panely jednotlivě přes HTTP nejdou, proto se stahuje
+  celý zip partu z Releases (sleduje redirect), ověří se sha256 a rozbalí se
+  jen `pack.json`, obálky a média. Text bublin v obrázcích není: plátno ho
+  kreslí z dat podle pravidel appky (vypravěč vlevo nahoře, bubliny cik cak).
+  Balíky `adult` jen s `WEBTOON_ALLOW_ADULT=1`. Ručně dělané složky
+  `data/webtoon/<id>/` fungují dál, bez bublin.
+- Scéna webtoonu hraje 1–4 epizody vedle sebe. Pozice je funkce času od
+  startu scény, takže reload plátna i náhled ve Studiu skončí na stejném
+  panelu.
+- **Pásy** (`strips`) jsou vlastní scéna z fotek ve show frontě. Vzhled je
+  podle Restyleru (`strip.dart`), mřížku skládá plátno; Restyler ji přes
+  HTTP nevydává.
+- **Vlasy ve větru** (`breeze`): prompt z Restyler presetu hair-breeze na
+  grafu Wan. Je generativní, proto čeká na operátora vždy jako tanec, i v
+  relaxed. Po schválení hraje místo fotky (přednost před živým portrétem)
+  a nikdy není samostatnou položkou fronty. Host ho objednat nemůže.
+  Úsměv a mrknutí už dělá driver `alive`; samostatné drivery nevznikly,
+  protože vznik `alive.mp4` není v repu popsaný.
+- **StyleMap ze session**: PartyCockpit staví packy sám v Go. Ol1nLLM
+  `tools/stylemap` potřebuje Python, torch, CLIP a LPIPS a na notebooku ani
+  boxu nepoběží. Tady stačí barevný otisk 12×12, uzavřená cesta
+  nejbližšího souseda a 2-opt. Přechody jsou méně plynulé než s LPIPS, zato
+  pack vznikne za sekundy a offline. Session se dělí podle promptu (bez
+  `origin: upload`, bez obrázků s `taxo.band` jiným než safe). Soubory mají
+  schéma Ol1nLLM (`map.json`, `atlas.jpg`, `t/<i>.jpg`), proto je plátno
+  i oba Cockpity čtou beze změny. `/stylemaps/index.json` spojuje lokální
+  packy (`source: party`) a upstream (`finetune`, z cache i offline).
+- **Show**: seznam scén s položkami přímo v parametrech (`episodes`,
+  `packs`, `assets`, `images`), délkou a `params.seed`. Hraje ji server
+  (`api/show.go`), plátno jen kreslí. Každý náhodný výběr scény bere seed,
+  takže se show hýbe pokaždé stejně. PANIC show pozastaví. Po restartu
+  serveru show stojí, kde byla.
+- **Výstupy GPU se počítají jednou** a zůstávají jako soubory party.
+  Show jde uložit do knihovny `data/shows/<slug>/` (fotky a klipy se
+  zkopírují, janitor ji nemaže) a načíst do jiné party jako schválené
+  assety Studia. Tím příprava přežije TTL party.
+- **Fotky ze Studia** patří skrytému hostovi party (`guests.hidden`,
+  migrace 5). Nelosuje se, nepočítá se a v Cockpitu není vidět. Restyle se
+  po dokončení schválí sám, protože fotku nahrál operátor. Originál po
+  selhání a vygenerované klipy čekají na ✓ jako všude.
+- **Náhled ve Studiu** je plátno v iframu (`/stage/<kód>?preview=<id>`),
+  které kreslí jeden záznam show bez QR a bez zápisu cache. Rámování je
+  povolené jen pro `/stage/` a jen stejným originem (`X-Frame-Options:
+  SAMEORIGIN`, `frame-ancestors 'self'`). Jinde zůstává DENY.
+- **GPU** jede přes `COMFY_URL`: okno na SPARKu bere uživatel přes broker
+  (`sparkctl lease`), nebo L40S (D13). PartyCockpit s brokerem nemluví.
+- Studio je jen ve Svelte. Oba Cockpity mají jen lištu show (⏮ ▶/⏸ ⏭)
+  a nové scény a parametry (D21 parita pro party, ne pro přípravu).
+  Průběh stahování a stavby packů Studio zjišťuje dotazováním, ne přes WS.
+- **Co se ukázalo:**
+  - FineTuneGallery API nevrací `source_image_id`, předlohu session jde
+    poznat jen jako jediný obrázek s `origin: upload`. Pro dělení podle
+    promptu to stačí; kdyby show chtěla předlohu ukázat, chce to pole
+    v `gallery.go` FineTuneGallery.
+  - Gamebooky Toonfork mají v názvu příběhu i název dílu
+    („Kniha — Díl“), knihovna ho z příběhu ořízne.
+  - Panely packů nejsou vždy na výšku (Sára má polovinu 1216×832), sloupce
+    proto berou poměr stran z dat panelu.

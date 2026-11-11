@@ -3,7 +3,7 @@
   import { api, store } from '../lib/api';
   import { connect, type Socket } from '../lib/ws';
   import { listPacks, type PackInfo } from '../lib/stylemap';
-  import type { Asset, CockpitState, Episode, Party, SceneKind, ShowEntry, ShowState } from '../lib/types';
+  import { plural, type Asset, type CockpitState, type Episode, type Party, type SceneKind, type ShowEntry, type ShowState } from '../lib/types';
   import EntryEditor from './EntryEditor.svelte';
   import Photos from './Photos.svelte';
   import WebtoonLibrary from './WebtoonLibrary.svelte';
@@ -215,7 +215,7 @@
 
     <div class="layout">
       <section class="show">
-        <h2>Show <span class="muted">{entries.length} scén · {fmt(total)}{saving ? ' · ukládám…' : ''}</span></h2>
+        <h2>Show <span class="muted">{entries.length} {plural(entries.length, 'scéna', 'scény', 'scén')} · {fmt(total)}{saving ? ' · ukládám…' : ''}</span></h2>
         <input placeholder="název show (např. Ema 40)" bind:value={name} oninput={changed} />
         <ol>
           {#each entries as e, i (e.id)}

@@ -13,6 +13,7 @@ Mac Mini, Windows mini PC nebo domácí server.
 |---|---|---|
 | Stage | `/stage/<KÓD>?key=…` (odkaz „Otevřít plátno“ v Cockpitu) | prohlížeč na Mac Mini / mini PC s HDMI do TV (kiosk) |
 | Cockpit | `/cockpit/<KÓD>` | operátor (telefon, tablet, notebook) |
+| Studio | `/studio/<KÓD>` | operátor: show připravená dopředu, na party offline |
 | Guest | `/join/<KÓD>` | hosté (QR na plátně), bez instalace a účtu |
 
 ## Scény
@@ -21,10 +22,16 @@ Mac Mini, Windows mini PC nebo domácí server.
 - **Galerie hostů**: přemalované selfie ze show fronty.
 - **Vzkazy**: zeď s ručně psanými lístky.
 - **Now playing**: skladba a fronta z DJfy s hlasy.
-- **Webtoon**: předpřipravené epizody s auto-scrollem.
+- **Webtoon**: příběhy z katalogu Toonfork, 1 až 4 stripy vedle sebe, každý
+  roluje svým tempem, bubliny kreslí plátno (čeština a další jazyky).
+- **Pásy**: přemalované fotky v pásech jako v Restyleru, sloupce rolují cik cak.
+  Místo fotky hraje její klip: mrknutí a úsměv, nebo vlasy ve větru.
 - **Losování**: kdo hraje o přestávce.
 - **Tančírna**: hosté tančí na plátně. Telefon → „Roztanči mě“ → Wan na GPU → schválení.
 - **Živé portréty**: fotky v galerii mrkají a rozhlížejí se (LivePortrait).
+- **StyleMap**: jedna postava v desítkách stylů jako plynulá proměna, až 9
+  packů naráz. Packy jdou postavit i ze session FineTuneGallery (jeden prompt,
+  jeden pack).
 - **Živě**: mřížka živých kamer z telefonů (prohlížeč nebo MirrorBooth) až 3×3, po schválení operátorem.
 - **Mezihra**.
 
@@ -58,11 +65,20 @@ Docker: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --bui
 | Restyler backend | restyle selfie (`restyle_flux`, drží obličej) | `RESTYLE_PROVIDER=restyler`, `RESTYLER_*` |
 | ComfyUI (L40S) | týž `restyle_flux` přímo v ComfyUI, bez Restyler API | `RESTYLE_PROVIDER=comfy`, `COMFY_URL` |
 | AiStack | záloha restyle (flux-kontext), NSFW tagger (WD14) | `AISTACK_URL`, `MODERATION=aistack` |
-| FineTuneGallery | obrázky do slideshow | `FINETUNE_URL` |
+| FineTuneGallery | obrázky do slideshow, sessions pro StyleMap packy | `FINETUNE_URL` |
+| Toonfork (webtoon-content) | hotové webtoon příběhy (zip packy na GitHub Releases) | `WEBTOON_CATALOG_URL`, `WEBTOON_ALLOW_ADULT` |
 | ComfyUI (L40S) | živé portréty (LivePortrait) a tanec (Wan 2.2 I2V) | `ANIMATE_PROVIDER=comfy`, `COMFY_URL` |
 | DJfy | now playing, sdílená fronta, hlasování, BPM | `DJFY_URL` + v Cockpitu kód DJfy party |
 
 Hosty za Cloudflare Access ověřuje `CF_ACCESS_CLIENT_ID/SECRET`.
+
+## Scene Studio
+
+Show se dá připravit dopředu: scény s položkami, délkami a seedem, náhled
+scény, vlastní fotky přes GPU, stažené webtoony a StyleMap packy. Výstupy
+z GPU se uloží jako soubory, takže na party stačí notebook bez internetu
+a show se hýbe pokaždé stejně. Hotovou show jde uložit do knihovny a načíst
+do jiné party. Postup i se SPARK oknem: [`docs/studio.md`](docs/studio.md).
 
 ## Party box (Raspberry Pi)
 

@@ -144,6 +144,29 @@ Konzole bez chyb. Neověřeno: náhledy živých streamů a mikrofon v Reactu
 Neověřeno: restyle_flux na skutečném ComfyUI na L40S (modely PuLID a depth
 musí být na VM), Windows build na skutečném Windows, Cloudflare Tunnel.
 
+## 2026-11-11: Stripy, Pásy, StyleMapy ze session, Scene Studio (D23)
+
+| Část | Stav |
+|---|---|
+| Webtoon z katalogu Toonfork: import zipů (sha256), 1–4 stripy vedle sebe, bubliny z dat | ✅ testy + Chrome |
+| Pásy: fotky v pásech cik cak, klipy místo fotek | ✅ Chrome (mock) |
+| Vlasy ve větru (`breeze`, Wan): čeká na ✓, hraje místo fotky | ✅ testy, mock v Chrome |
+| StyleMap packy ze session FineTuneGallery (Go, podle promptu), sweep až 3×3 | ✅ testy + Chrome (falešná galerie) |
+| Scene Studio: show, editor scén, náhled, fotky, knihovna webtoonu a StyleMap, offline kontrola, knihovna show | ✅ testy + Chrome |
+| Lišta show v obou Cockpitech | ✅ Chrome |
+
+Ověřeno v Chrome na mocku (`127.0.0.1:18098`): stažený gamebook Sára
+z živého katalogu, tři sloupce webtoonu s českými bublinami, pásy z 9 fotek
+(sloupce střídavě nahoru a dolů), tři packy z jedné session (falešná
+FineTuneGallery ze statických souborů) jako dlaždice. Show se čtyřmi
+scénami: kontrola offline 4/4, pak server s nedostupnou galerií i
+katalogem přehrál všechny scény v pořadí bez rozbitého obrázku. Dvě
+spuštění pásů se stejným seedem se po 3 s lišila o 1 px. Uložení show do
+knihovny a načtení do nové party funguje i z UI.
+**Neověřeno:** restyle a klipy na skutečném ComfyUI (SPARK okno nebo L40S),
+`breeze` na Wan (kvalita vlasů), výkon 4 sloupců s animovanými panely a pásů
+s klipy na Raspberry Pi, reálná session FineTuneGallery (za CF Access).
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).
@@ -153,3 +176,4 @@ musí být na VM), Windows build na skutečném Windows, Cloudflare Tunnel.
    vah LivePortrait pro B2B.
 5. Party box: projít `deploy/box/README.md` na skutečném Raspberry Pi 5.
 6. M7 ověřit naostro: Translator s ASR (okno na SPARKu přes broker), reálné StyleMap balíčky (CF token). M5 3D tanečníci.
+7. Studio naostro (D23): SPARK okno přes broker, `COMFY_URL`, restyle a `breeze` na skutečném ComfyUI, pak show offline na notebooku podle `docs/studio.md`.

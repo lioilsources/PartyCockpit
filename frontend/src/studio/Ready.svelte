@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { plural } from '../lib/types';
   import type { StudioApi } from './kinds';
 
   // "Is it all on this laptop?" (D23): every entry of the show checked against
@@ -47,7 +48,7 @@
 </div>
 {#if checked}
   <p class:good={ok === items.length && !processing} class:bad={ok < items.length}>
-    {ok}/{items.length} scén poběží bez sítě{processing ? ` · na GPU ještě čeká ${processing}` : ''}
+    {ok}/{items.length} {plural(items.length, 'scéna poběží', 'scény poběží', 'scén poběží')} bez sítě{processing ? ` · na GPU ještě čeká ${processing}` : ''}
   </p>
   <ul>
     {#each items as it (it.entryId)}
