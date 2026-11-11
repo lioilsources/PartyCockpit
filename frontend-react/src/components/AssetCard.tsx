@@ -19,6 +19,7 @@ export function AssetCard({ code, asset: a, fileKey, onApprove, onReject }: Prop
       <div className={ui.meta}>
         <strong>{a.meta.nickname}</strong>
         {a.kind === 'dance' && <span>💃 tanec {a.meta.motionLabel}</span>}
+        {a.kind === 'breeze' && <span>💨 vlasy ve větru (hraje místo fotky)</span>}
         {a.meta.styleLabel && <span>{a.meta.styleLabel}</span>}
         {a.meta.fallback && <span className={ui.warn}>originál (restyle selhal)</span>}
         {a.nsfwScore >= 0 && <span className={cx(a.nsfwScore > 0.15 && ui.warn)}>NSFW {a.nsfwScore.toFixed(2)}</span>}

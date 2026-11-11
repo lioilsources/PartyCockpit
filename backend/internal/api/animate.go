@@ -8,6 +8,9 @@ package api
 //	        carries the clip).
 //	dance — Wan image-to-video of a guest's own photo. Generative, so it always
 //	        waits for the operator and then joins the show queue like a photo.
+//	breeze — Wan hair-in-the-breeze of an approved photo, ordered by the
+//	        operator (D23). Generative, so it waits for the operator like a
+//	        dance, then plays in place of the photo like a living picture.
 //
 // Animations get their own worker so a 1–3 min dance never delays restyles.
 
@@ -52,8 +55,8 @@ func (s *Server) submitAnimation(ctx context.Context, p store.Party, src store.A
 	var srcMeta map[string]any
 	json.Unmarshal(src.Meta, &srcMeta)
 	kind := "dance"
-	if m.Engine == "live" {
-		kind = "live"
+	if m.Engine == "live" || m.Engine == "breeze" {
+		kind = m.Engine
 	}
 	meta, _ := json.Marshal(map[string]any{
 		"motion": m.ID, "motionLabel": m.Label, "nickname": srcMeta["nickname"],
@@ -79,7 +82,7 @@ func (s *Server) submitAnimation(ctx context.Context, p store.Party, src store.A
 
 func (s *Server) runAnim(t animTask) {
 	timeout := 5 * time.Minute
-	if t.motion.Engine == "dance" {
+	if t.motion.Engine != "live" {
 		timeout = 20 * time.Minute
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -169,13 +172,23 @@ func (s *Server) listMotions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, providers.Motions)
 }
 
-// animateGallery (cockpit) orders living loops for the given photos, or for
-// every photo in the show queue that has none yet.
+// animateGallery (cockpit) orders living loops ("alive", default) or hair in
+// the breeze ("breeze") for the given photos, or for every photo in the show
+// queue that has none yet.
 func (s *Server) animateGallery(w http.ResponseWriter, r *http.Request, p store.Party) {
 	var in struct {
-		IDs []string `json:"ids"`
+		IDs    []string `json:"ids"`
+		Motion string   `json:"motion"`
 	}
 	_ = readJSON(r, &in)
+	if in.Motion == "" {
+		in.Motion = "alive"
+	}
+	m, ok := providers.MotionByID(in.Motion)
+	if !ok || (m.Engine != "live" && m.Engine != "breeze") {
+		writeErr(w, 400, "neznámý pohyb")
+		return
+	}
 	ctx := r.Context()
 	var photos []store.Asset
 	if len(in.IDs) > 0 {
@@ -192,13 +205,12 @@ func (s *Server) animateGallery(w http.ResponseWriter, r *http.Request, p store.
 		}
 		photos = q
 	}
-	m, _ := providers.MotionByID("alive")
 	n := 0
 	for _, a := range photos {
 		if a.Kind != "restyle" || a.File == "" {
 			continue
 		}
-		if _, err := s.Store.AnimationOf(ctx, a.ID, "live"); err == nil {
+		if _, err := s.Store.AnimationOf(ctx, a.ID, m.Engine); err == nil {
 			continue
 		}
 		if _, err := s.submitAnimation(ctx, p, a, m); err != nil {

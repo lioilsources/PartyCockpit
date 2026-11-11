@@ -152,3 +152,80 @@ func TestLivingPicturesAndDance(t *testing.T) {
 		t.Fatalf("foreign photo: %d, want 404", st)
 	}
 }
+
+// Hair in the breeze (D23): ordered by the operator, waits for approval like a
+// dance, then plays in place of the photo (before its living loop) and never
+// becomes a queue item of its own.
+func TestBreezeWaitsThenPlaysInPlace(t *testing.T) {
+	e := newEnv(t)
+	var g struct {
+		ID string `json:"id"`
+	}
+	e.do("POST", "/api/parties/"+e.code+"/guests", map[string]any{"nickname": "Vlasatá"}, &g)
+	photo := e.upload(g.ID)
+	e.waitAsset(g.ID, photo.ID, "pending")
+	e.do("POST", "/api/parties/"+e.code+"/assets/"+photo.ID+"/approve", nil, nil)
+
+	var n struct {
+		Queued int `json:"queued"`
+	}
+	if st := e.do("POST", "/api/parties/"+e.code+"/animate", map[string]any{"motion": "breeze"}, &n); st != 200 || n.Queued != 1 {
+		t.Fatalf("breeze: %d queued %d", st, n.Queued)
+	}
+	if st := e.do("POST", "/api/parties/"+e.code+"/animate", map[string]any{"motion": "disco"}, nil); st != 400 {
+		t.Fatalf("a dance from the gallery button: %d, want 400", st)
+	}
+	var breeze store.Asset
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && breeze.Status != "pending" {
+		var r struct {
+			Assets []store.Asset `json:"assets"`
+		}
+		e.do("GET", "/api/parties/"+e.code+"/guests/"+g.ID+"/assets", nil, &r)
+		for _, a := range r.Assets {
+			if a.Kind == "breeze" && a.SrcID == photo.ID {
+				breeze = a
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if breeze.Status != "pending" || breeze.File == "" {
+		t.Fatalf("breeze clip must wait for the operator, got %+v", breeze)
+	}
+	var q []store.Asset
+	e.do("GET", "/api/parties/"+e.code+"/queue", nil, &q)
+	if len(q) != 1 || q[0].Live != "" {
+		t.Fatalf("a pending clip must not play, got %+v", q)
+	}
+	if res, _ := http.Get(e.ts.URL + "/files/" + e.code + "/" + breeze.File); res.StatusCode != 404 {
+		t.Fatalf("pending clip served publicly: %d", res.StatusCode)
+	}
+
+	e.do("POST", "/api/parties/"+e.code+"/assets/"+breeze.ID+"/approve", nil, nil)
+	e.do("GET", "/api/parties/"+e.code+"/queue", nil, &q)
+	if len(q) != 1 || q[0].ID != photo.ID || q[0].Live != breeze.File {
+		t.Fatalf("approved breeze must play in place of the photo, got %+v", q)
+	}
+	if res, _ := http.Get(e.ts.URL + "/files/" + e.code + "/" + breeze.File); res.StatusCode != 200 {
+		t.Fatalf("approved clip: %d", res.StatusCode)
+	}
+
+	// a living loop made later does not push the breeze clip out
+	e.do("POST", "/api/parties/"+e.code+"/animate", map[string]any{}, &n)
+	deadline = time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if a, ok := e.liveOf(g.ID, photo.ID); ok && a.Status == "approved" {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	e.do("GET", "/api/parties/"+e.code+"/queue", nil, &q)
+	if q[0].Live != breeze.File {
+		t.Fatalf("breeze must win over the living loop, got %q", q[0].Live)
+	}
+
+	// guests cannot order it as a dance
+	if st := e.do("POST", "/api/parties/"+e.code+"/guests/"+g.ID+"/dance", map[string]any{"assetId": photo.ID, "move": "breeze"}, nil); st != 400 {
+		t.Fatalf("guest breeze: %d, want 400", st)
+	}
+}

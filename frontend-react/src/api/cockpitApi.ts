@@ -8,6 +8,7 @@ export type SceneParams = {
   episodes?: string[];
   lang?: string;
   speed?: number;
+  cols?: number;
   pack?: string;
   transition?: string;
   shader?: string;
@@ -35,7 +36,8 @@ export function cockpitApi(code: string, token: string) {
     reject: (id: string) => post(`/assets/${id}/reject`),
     reorder: (ids: string[]) => http.put<undefined>(p('/queue'), { ids }, token),
     unqueue: (id: string) => del(`/queue/${id}`),
-    animate: () => post<{ queued: number }>('/animate'),
+    /** Living loops ("alive") or hair in the breeze ("breeze", D23) for the whole gallery. */
+    animate: (motion: 'alive' | 'breeze' = 'alive') => post<{ queued: number }>('/animate', { motion }),
     tempo: (body: TempoBody) => post('/tempo', body),
     lottery: (count: number, game: string) => post('/lottery', { count, game }),
     startGame: () => post('/game'),

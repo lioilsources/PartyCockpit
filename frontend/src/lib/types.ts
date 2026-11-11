@@ -1,5 +1,5 @@
 export type Scene = { kind: SceneKind; params: Record<string, any>; startedAt: number };
-export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap' | 'stylesweep' | 'game';
+export type SceneKind = 'slideshow' | 'gallery' | 'stickers' | 'nowplaying' | 'webtoon' | 'lottery' | 'blank' | 'pipwall' | 'dance' | 'interlude' | 'recap' | 'stylesweep' | 'game' | 'strips';
 
 export type Party = {
   code: string;
@@ -19,7 +19,7 @@ export type Party = {
 };
 
 /** Animation presets (backend providers/animate.go). */
-export type Motion = { id: string; label: string; engine: 'live' | 'dance'; seconds: number };
+export type Motion = { id: string; label: string; engine: 'live' | 'dance' | 'breeze'; seconds: number };
 
 /** Clips are mp4 from the GPU, animated GIF from the mock provider. */
 export const isVideo = (file?: string) => !!file && /\.(mp4|webm)$/i.test(file);
@@ -39,7 +39,7 @@ export type AssetStatus = 'processing' | 'pending' | 'approved' | 'rejected' | '
 export type Asset = {
   id: string;
   guestId: string;
-  kind: 'restyle' | 'sticker' | 'upload' | 'live' | 'dance';
+  kind: 'restyle' | 'sticker' | 'upload' | 'live' | 'dance' | 'breeze';
   srcId?: string;
   file?: string;
   meta: {
@@ -57,7 +57,7 @@ export type Asset = {
     motionLabel?: string;
     photo?: string;
   };
-  /** Approved LivePortrait loop of this photo (show queue only, M4). */
+  /** Approved clip that plays in place of this photo: breeze (D23) before the LivePortrait loop (M4). Show queue only. */
   live?: string;
   nsfwScore: number;
   status: AssetStatus;
