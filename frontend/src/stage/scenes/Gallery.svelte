@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { ShowQueue } from '../../lib/showqueue';
+  import { rng } from '../../lib/rand';
   import type { BeatClock } from '../../lib/beat';
   import { fileUrl, type Asset } from '../../lib/types';
   import Clip from '../../lib/Clip.svelte';
@@ -17,7 +18,7 @@
 
   const photos = $derived(queue.filter((a) => (a.kind === 'restyle' || a.kind === 'upload') && a.file));
   const beats = $derived(Math.max(2, Number(params.beats) || 8));
-  const picker = new ShowQueue<Asset>();
+  const picker = new ShowQueue<Asset>(rng(params.seed, 4));
   let hero = $state<Asset | null>(null);
   let heroKey = $state(0);
   let count = 0;

@@ -34,13 +34,17 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `frontend/src/stage` — scény (`scenes/*.svelte`), overlaye, PixiJS reakce
 - `frontend/src/lib/beat.ts` — BeatClock (tempo ze serveru / audio / idle), TapTempo
 - `frontend/src/lib/rtc.ts` — Viewer (plátno/Cockpit) a Publisher (telefon); MirrorBooth: `docs/mirrorbooth-stream.md`
-- `frontend/src/lib/showqueue.ts` — výběr z show fronty (nové napřed, pak loop/shuffle)
+- `frontend/src/lib/showqueue.ts` — výběr z show fronty (nové napřed, pak loop/shuffle); `lib/rand.ts` seed scén
+- `backend/internal/webtoon` — Toonfork katalog, import zip packů, epizody; `stage/scenes/Strip`, `Bubbles` (D23)
+- `backend/internal/stylemap` + `api/stylemaps.go` — StyleMap packy ze session FineTuneGallery (D23)
+- `api/show.go`, `showlib.go`, `studio.go` + `frontend/src/studio` — Scene Studio, offline show (`docs/studio.md`)
 
 ## Invarianty
 - **Nic od hosta na plátno bez schválení.** Stage čte jen `stage_queue` (approved).
   Originál po selhaném restyle se nikdy neschvaluje automaticky.
 - Originální fotky (`kind=upload`, `status=source`) se na plátno nedostanou nikdy.
-- Živý portrét dědí schválení fotky. Tanec čeká na operátora vždy, i v relaxed režimu.
+- Živý portrét dědí schválení fotky. Tanec i vlasy ve větru čekají na operátora vždy, i v relaxed režimu.
+- Fotky ze Studia (skrytý host) se po restylu schválí samy; jejich originál po selhání ne (D23).
 - GPU pro animace jede přes L40S session (ComfyUI). SPARK jen přes broker.
 - Živý stream jde na plátno až po „pustit“ v Cockpitu. Server plátnu neposílá pending streamy.
 - GPU se nečeká synchronně: upload vrátí 202, job běží ve worker poolu.

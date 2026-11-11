@@ -37,6 +37,15 @@ describe('cockpitReducer', () => {
     expect(cockpitReducer(s, { type: 'subtitle.clear', data: null }).subs).toEqual([]);
   });
 
+  it('keeps the show, its entries never null', () => {
+    const s = cockpitReducer(initialModel, {
+      type: 'show',
+      data: { name: 'Večer', entries: null, loop: true, updatedAt: 1, playing: false, index: 0, entryId: '', startedAt: 0, endsAt: 0 },
+    });
+    expect(s.show?.entries).toEqual([]);
+    expect(s.show?.name).toBe('Večer');
+  });
+
   it('leaves state alone for signalling', () => {
     expect(cockpitReducer(initialModel, { type: 'hello', data: null })).toBe(initialModel);
     expect(cockpitReducer(initialModel, { type: 'rtc', data: { kind: 'bye', stream: 's1' } })).toBe(initialModel);

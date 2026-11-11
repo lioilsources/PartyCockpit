@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
   import { ShowQueue } from '../../lib/showqueue';
+  import { rng } from '../../lib/rand';
   import { fileUrl, type Asset, type Tempo } from '../../lib/types';
   import Clip from '../../lib/Clip.svelte';
 
@@ -31,7 +32,7 @@
   const beats = $derived(Math.max(4, Number(params.beats) || 16));
   const rate = $derived(tempo && tempo.bpm > 0 ? Math.min(1.1, Math.max(0.9, tempo.bpm / NOMINAL_BPM)) : 1);
 
-  const picker = new ShowQueue<Asset>();
+  const picker = new ShowQueue<Asset>(rng(params.seed, 7));
   let floor = $state<Asset[]>([]);
   let swap = 0;
   let count = 0;

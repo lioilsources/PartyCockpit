@@ -92,7 +92,7 @@
                   <img src={src(a)} alt="" decoding="async" />
                 {/if}
                 {#if labels}
-                  <figcaption>{a.meta.nickname ?? 'host'}{a.meta.styleLabel && !a.meta.fallback ? ` · ${a.meta.styleLabel}` : ''}</figcaption>
+                  <figcaption>{[a.meta.nickname, a.meta.fallback ? '' : a.meta.styleLabel].filter(Boolean).join(' · ')}</figcaption>
                 {/if}
               </figure>
             {/each}

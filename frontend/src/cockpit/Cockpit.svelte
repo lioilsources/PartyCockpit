@@ -4,7 +4,7 @@
   import { connect, type Socket } from '../lib/ws';
   import { TapTempo } from '../lib/beat';
   import { Viewer, srcObject, type RtcMsg } from '../lib/rtc';
-  import { fileUrl, plural, recapUrl, type Asset, type Check, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type SceneKind, type SubtitleLine, type Tempo } from '../lib/types';
+  import { fileUrl, plural, recapUrl, type Asset, type Check, type CockpitState, type Episode, type MusicSnapshot, type Party, type LiveStream, type ShowState, type SceneKind, type SubtitleLine, type Tempo } from '../lib/types';
   import Clip from '../lib/Clip.svelte';
   import { Mic } from '../lib/mic';
   import { listPacks, type PackInfo } from '../lib/stylemap';
@@ -35,6 +35,7 @@
   let streams = $state<LiveStream[]>([]);
   let rtcRev = $state(0);
   let viewer = $state<Viewer | null>(null);
+  let show = $state<ShowState | null>(null); // the Studio show (D23)
 
   function start() {
     sock?.close();
@@ -53,6 +54,7 @@
         else if (m.type === 'hello') viewer?.reset();
         else if (m.type === 'subtitle') subLine(m.data as SubtitleLine);
         else if (m.type === 'subtitle.clear') subs = [];
+        else if (m.type === 'show') show = m.data;
       },
       (o) => (online = o),
       async () => ({ ticket: await socketTicket() }),
@@ -216,6 +218,17 @@
     wtEpisodes = wtEpisodes.includes(id) ? wtEpisodes.filter((x) => x !== id) : [...wtEpisodes, id].slice(-4);
   }
 
+  // ── Studio show (D23): play, pause, step; editing is in /studio
+  let nowTick = $state(Date.now());
+  const showTicker = setInterval(() => (nowTick = Date.now()), 1000);
+  onDestroy(() => clearInterval(showTicker));
+  const showEntry = $derived(show?.playing ? show.entries[show.index] : undefined);
+  function showCtl(action: 'play' | 'pause' | 'next' | 'prev') {
+    act(async () => {
+      show = await api.post<ShowState>(p(`/show/${action}`), {}, token);
+    });
+  }
+
   function setScene(kind: SceneKind) {
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
@@ -352,6 +365,7 @@
       </div>
       <div class="links">
         <a href={`/stage/${code}?key=${st?.config.stageKey ?? ''}`} target="_blank">Otevřít plátno ↗</a>
+        <a href={`/studio/${code}`} target="_blank">🎬 Studio ↗</a>
         <a href={party.joinUrl} target="_blank">{party.joinUrl}</a>
       </div>
       <span class="ends">
@@ -364,6 +378,16 @@
 
     <section class="scenes">
       <h2>Scéna na plátně: <strong>{party.scene.kind}</strong></h2>
+      <div class="row small">
+        {#if show?.entries.length}
+          <span>🎬 {show.name || 'Show'}: {showEntry ? `hraje ${show.index + 1}/${show.entries.length} · ${showEntry.title || showEntry.kind} · ${Math.max(0, Math.round((show.endsAt - nowTick) / 1000))} s` : 'stojí'}</span>
+          <button onclick={() => showCtl('prev')} title="předchozí scéna">⏮</button>
+          {#if show.playing}<button class="on" onclick={() => showCtl('pause')}>⏸</button>{:else}<button onclick={() => showCtl('play')}>▶</button>{/if}
+          <button onclick={() => showCtl('next')} title="další scéna">⏭</button>
+        {:else}
+          <span class="muted">🎬 Žádná show.</span> <a href={`/studio/${code}`} target="_blank">Připravit ve Studiu ↗</a>
+        {/if}
+      </div>
       <div class="row">
         {#each scenes as s (s.kind)}
           <button class:on={party.scene.kind === s.kind} onclick={() => setScene(s.kind)}>{s.label}</button>

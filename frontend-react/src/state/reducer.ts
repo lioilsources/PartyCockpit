@@ -1,4 +1,4 @@
-import type { Asset, CockpitState, LiveStream, MusicSnapshot, Party, SubtitleLine, Tempo } from '@pc/lib/types';
+import type { Asset, CockpitState, LiveStream, MusicSnapshot, Party, ShowState, SubtitleLine, Tempo } from '@pc/lib/types';
 import type { CockpitMsg, Wire } from './messages';
 
 export type CockpitModel = {
@@ -12,6 +12,8 @@ export type CockpitModel = {
   streams: LiveStream[];
   /** newest first; one id is updated several times while the MC speaks */
   subs: SubtitleLine[];
+  /** the Studio show and where it plays (D23) */
+  show: ShowState | null;
 };
 
 export const MAX_REACTIONS = 14;
@@ -26,6 +28,7 @@ export const initialModel: CockpitModel = {
   reactions: [],
   streams: [],
   subs: [],
+  show: null,
 };
 
 const lists = (st: Wire<CockpitState>): CockpitState => ({
@@ -62,6 +65,8 @@ export function cockpitReducer(s: CockpitModel, m: CockpitMsg): CockpitModel {
     }
     case 'subtitle.clear':
       return { ...s, subs: [] };
+    case 'show':
+      return { ...s, show: { ...m.data, entries: m.data.entries ?? [] } };
     case 'rtc':
     case 'hello':
       // WebRTC signalling is a side effect of the socket hook, not state

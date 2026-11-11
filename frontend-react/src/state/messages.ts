@@ -1,6 +1,6 @@
 import type { WsMsg } from '@pc/lib/ws';
 import type { RtcMsg } from '@pc/lib/rtc';
-import type { Asset, CockpitState, LiveStream, MusicSnapshot, Party, SubtitleLine, Tempo } from '@pc/lib/types';
+import type { Asset, CockpitState, LiveStream, MusicSnapshot, Party, ShowState, SubtitleLine, Tempo } from '@pc/lib/types';
 
 /**
  * What actually arrives: Go encodes an empty (nil) slice as null, so every
@@ -21,7 +21,8 @@ export type CockpitMsg =
   | { type: 'rtc'; data: RtcMsg }
   | { type: 'hello'; data: unknown }
   | { type: 'subtitle'; data: SubtitleLine }
-  | { type: 'subtitle.clear'; data: unknown };
+  | { type: 'subtitle.clear'; data: unknown }
+  | { type: 'show'; data: Wire<ShowState> };
 
 export type CockpitMsgType = CockpitMsg['type'];
 
@@ -39,6 +40,7 @@ const KNOWN: Record<CockpitMsgType, true> = {
   hello: true,
   subtitle: true,
   'subtitle.clear': true,
+  show: true,
 };
 
 /**

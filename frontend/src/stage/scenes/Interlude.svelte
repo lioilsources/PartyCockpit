@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { rng } from '../../lib/rand';
   import { onDestroy, onMount } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
   import { shaders, shaderById, type Shader } from '../shaders';
@@ -19,7 +20,7 @@
   let gl: WebGLRenderingContext | null = null;
   let prog: WebGLProgram | null = null;
   let loc: Record<string, WebGLUniformLocation | null> = {};
-  let current = $state<Shader>(fixed ?? shaders[Math.floor(Math.random() * shaders.length)]);
+  let current = $state<Shader>(fixed ?? shaders[Math.floor(rng(params.seed, 6)() * shaders.length)]);
   let failed = $state(false);
   let raf = 0;
   let t0 = performance.now();

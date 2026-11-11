@@ -4,7 +4,7 @@
   import { connect } from '../lib/ws';
   import { store } from '../lib/api';
   import { BeatClock } from '../lib/beat';
-  import type { Asset, MusicSnapshot, Party, Tempo } from '../lib/types';
+  import type { Asset, MusicSnapshot, Party, ShowState, Tempo } from '../lib/types';
   import QrOverlay from './QrOverlay.svelte';
   import NowPlayingBar from './NowPlayingBar.svelte';
   import Reactions from './Reactions.svelte';
@@ -40,6 +40,10 @@
     history.replaceState(null, '', u.pathname + u.search);
   }
   const stageKey = qsKey ?? store.get(keyStore) ?? '';
+  // Studio preview (D23): ?preview=<entry id> draws that show entry instead of
+  // the live scene, from its start, without the QR; ?hud=1 shows where the show is
+  const preview = new URLSearchParams(location.search).get('preview');
+  const hud = new URLSearchParams(location.search).get('hud') === '1';
 
   // The stage survives a backend outage (plan §8): last state is cached and the
   // scenes keep running on what they already have.
@@ -67,6 +71,7 @@
   let needsAudioClick = $state(false);
   let streams = $state<LiveStream[]>([]);
   let tempo = $state<Tempo | null>(null);
+  let show = $state<ShowState | null>(null);
   let rtcRev = $state(0);
   // created before the socket; sends go through it once it exists
   const viewer = new Viewer((m) => sock?.send(m) ?? false, [], () => rtcRev++);
@@ -78,7 +83,7 @@
   });
 
   function save() {
-    store.set(cacheKey, JSON.stringify({ party, queue, music }));
+    if (!preview) store.set(cacheKey, JSON.stringify({ party, queue, music }));
   }
 
   const sock = connect(
@@ -121,6 +126,9 @@
         case 'streams':
           streams = m.data ?? [];
           break;
+        case 'show':
+          show = m.data as ShowState;
+          return;
         case 'rtc':
           viewer.handle(m.data as RtcMsg);
           return;
@@ -156,7 +164,15 @@
     clock.destroy();
   });
 
-  const scene = $derived(party?.scene ?? { kind: 'slideshow', params: {}, startedAt: 0 });
+  const previewEntry = $derived(preview ? (show?.entries.find((e) => e.id === preview) ?? null) : null);
+  // an edited entry starts over: the key carries its parameters
+  const previewKey = $derived(previewEntry ? JSON.stringify([previewEntry.kind, previewEntry.params]) : '');
+  const previewStart = $derived((void previewKey, Date.now()));
+  const scene = $derived(
+    previewEntry
+      ? { kind: previewEntry.kind, params: previewEntry.params, startedAt: previewStart }
+      : (party?.scene ?? { kind: 'slideshow', params: {}, startedAt: 0 }),
+  );
   const loopMode = $derived(party?.loopMode ?? 'loop');
   const sceneKey = $derived(`${scene.kind}:${scene.startedAt}`);
 
@@ -175,7 +191,7 @@
   $effect(() => {
     const k = sceneKey;
     const pack = (scene.params as Record<string, any>)?.transition;
-    if (firstScene) {
+    if (firstScene || preview) {
       firstScene = false;
       return;
     }
@@ -197,7 +213,7 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="stage" class:pulse onclick={fullscreen}>
+<div class="stage" class:pulse class:preview={!!preview} onclick={fullscreen}>
   {#key sceneKey}
     <div class="scene" transition:fade={{ duration: 700 }}>
       {#if scene.kind === 'slideshow'}
@@ -205,7 +221,7 @@
       {:else if scene.kind === 'gallery'}
         <Gallery {code} {queue} {loopMode} params={scene.params} {clock} />
       {:else if scene.kind === 'stickers'}
-        <Stickers {queue} {loopMode} {clock} />
+        <Stickers {queue} {loopMode} {clock} params={scene.params} />
       {:else if scene.kind === 'nowplaying'}
         <NowPlaying {music} joinUrl={party?.joinUrl ?? ''} {clock} />
       {:else if scene.kind === 'webtoon'}
@@ -250,7 +266,11 @@
   {/if}
   {#if !online}<div class="offline" title="backend nedostupný — jedu z cache"></div>{/if}
   {#if !online && offlineSince && now - offlineSince > 30000}<div class="offline-label">server nedostupný, jedu z paměti</div>{/if}
-  {#if pairing}<PairingQr url={pairing} />{/if}
+  {#if pairing && !preview}<PairingQr url={pairing} />{/if}
+  {#if preview && !previewEntry}<div class="hint">náhled: scéna ve show není (ulož ji ve Studiu)</div>{/if}
+  {#if hud && show?.entries.length}
+    <div class="hud">show {show.index + 1}/{show.entries.length} · {show.entries[show.index]?.title || show.entries[show.index]?.kind} · {show.playing ? `${Math.max(0, Math.round((show.endsAt - now) / 1000))} s` : 'pauza'}</div>
+  {/if}
   {#if !stageKey}<div class="nokey">Plátno otevři tlačítkem „Otevřít plátno“ v Cockpitu (nese klíč).</div>{/if}
   {#if needsAudioClick}<div class="hint">klikni pro zapnutí mikrofonu (beat)</div>{/if}
 </div>
@@ -307,6 +327,20 @@
     padding: 1vw 2vw;
     border-radius: 1vw;
     font-size: 1.6vw;
+    z-index: 40;
+  }
+  /* the Studio preview shows the scene alone */
+  .preview :global(.qr) {
+    display: none;
+  }
+  .hud {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 13px;
     z-index: 40;
   }
   .hint {
