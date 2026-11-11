@@ -46,7 +46,10 @@ sloupců, začátky, pořadí. Rozhodnutí: `DECISIONS.md` D23.
 ## Na party (offline)
 
 1. Na notebooku u TV spusť PartyCockpit se stejným `PC_DATA_DIR`. Internet ani
-   GPU nejsou potřeba.
+   GPU nejsou potřeba. Když jsi připravoval na jiném počítači, zkopíruj z jeho
+   `PC_DATA_DIR` složky `shows`, `webtoon`, `stylemaps` a `gallery-cache` do
+   `data` vedle programu na notebooku. `partycockpit.db` a `party` nekopíruj:
+   party se zakládá na notebooku znovu.
 2. Založ party, otevři Studio → 💾 Knihovna → Načíst → „Nahradit současnou
    show“. Fotky a klipy se zkopírují do party jako schválené.
 3. Otevři plátno (Cockpit → „Otevřít plátno“), ve Studiu nebo v Cockpitu ▶.
