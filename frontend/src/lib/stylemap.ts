@@ -2,7 +2,8 @@
 // proxied by our backend. A pack is one subject in many styles; `tour` orders
 // the images with the smallest visual steps, so playing it looks like a morph.
 
-export type PackInfo = { id: string; title: string; n: number; aspect: number; atlas: string };
+/** source: party = built here from a FineTuneGallery session (D23), finetune = Ol1nLLM pack. */
+export type PackInfo = { id: string; title: string; n: number; aspect: number; atlas: string; source?: 'party' | 'finetune' };
 export type Frame = { src: string; label: string };
 export type Pack = { id: string; title: string; aspect: number; atlas: string; frames: Frame[] };
 

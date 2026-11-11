@@ -181,6 +181,12 @@
   let packs = $state<PackInfo[]>([]);
   let pack = $state(store.get('pc.stylemap') ?? '');
   let sweepTransition = $state(store.get('pc.stylemap.transition') === '1');
+  // several packs as tiles (D23); empty = the one pack above
+  let sweepPacks = $state<string[]>(JSON.parse(store.get('pc.stylemap.packs') ?? '[]'));
+  $effect(() => store.set('pc.stylemap.packs', JSON.stringify(sweepPacks)));
+  function togglePack(id: string) {
+    sweepPacks = sweepPacks.includes(id) ? sweepPacks.filter((x) => x !== id) : [...sweepPacks, id].slice(-9);
+  }
   listPacks()
     .then((ps) => {
       packs = ps;
@@ -219,7 +225,10 @@
       params.lang = wtLang;
       params.speed = wtSpeed;
     }
-    if (kind === 'stylesweep' && pack) params.pack = pack;
+    if (kind === 'stylesweep' && sweepPacks.length) {
+      params.packs = sweepPacks;
+      params.pack = sweepPacks[0];
+    } else if (kind === 'stylesweep' && pack) params.pack = pack;
     else if (sweepTransition && pack) params.transition = pack;
     if (kind === 'interlude') {
       params.beats = Math.max(beats, 16);
@@ -382,8 +391,19 @@
           </label>
           <label><input type="checkbox" bind:checked={sweepTransition} /> přechod přes StyleMap</label>
         {/if}
+        <a href={`/studio/${code}`} target="_blank">StyleMap ze session ve Studiu ↗</a>
         <a href={recapUrl(party.joinUrl)} target="_blank">recap pro hosty ↗</a>
       </div>
+      {#if packs.length > 1}
+        <details class="episodes">
+          <summary>🎨 StyleMap dlaždice: {sweepPacks.length ? `${sweepPacks.length} naráz` : 'jen jeden pack'}</summary>
+          <div class="eplist">
+            {#each packs as x (x.id)}
+              <label><input type="checkbox" checked={sweepPacks.includes(x.id)} onchange={() => togglePack(x.id)} /> {x.title} <span class="muted">({x.n}{x.source === 'party' ? ', lokální' : ''})</span></label>
+            {/each}
+          </div>
+        </details>
+      {/if}
       <details class="episodes">
         <summary>📖 Webtoon: {wtEpisodes.length ? `${wtEpisodes.length} ${plural(wtEpisodes.length, 'sloupec', 'sloupce', 'sloupců')}` : 'první epizoda'}</summary>
         <div class="row small">
