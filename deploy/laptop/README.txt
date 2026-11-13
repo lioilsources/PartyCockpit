@@ -80,7 +80,7 @@ a vzkazy: scény Galerie, Vzkazy a Pásy bez vybraných fotek je přidávají.
 - Odpoj internet, Wi-Fi pro telefony nech. Kontrola offline zelená.
 - Pusť show v loopu aspoň 30 minut a sleduj, jestli se scény netrhají
   (nejvíc Webtoon ve 4 sloupcích, Pásy s klipy, StyleMap 3×3, Tributy).
-  Když se trhají, ubere sloupců ve Studiu nebo nastav v .env
+  Když se trhají, uber ve Studiu sloupce nebo nastav v .env
   PC_STAGE_SCALE=0.5.
 - F5 na plátně uprostřed scény: plátno skončí na stejném místě.
 - Zavři okno serveru a spusť ho znovu: show stojí, kde byla, ▶ pokračuje.
