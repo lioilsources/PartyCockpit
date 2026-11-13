@@ -26,11 +26,30 @@ type Catalog struct {
 	byID     map[string]Style
 }
 
+// Retired styles: on restyle_flux they turned a clothed selfie into a nude
+// (classical nudes, pin-ups; FLUX ignores the negative prompt). Restyler
+// retires them too (kRetiredRestyleStyleIds); the list is kept here as well,
+// so a regenerated restyle_styles.json can never bring them back.
+var Retired = map[string]bool{
+	"davinci-chalk": true, "schiele": true, "greek": true, "greek-vase-red": true,
+	"cycladic": true, "himba": true, "pin-up-50s": true, "titian": true,
+	"rubens": true, "renoir": true, "zorn": true, "david-neoclassical": true,
+	"frazetta": true, "sorayama": true, "bacon": true, "botticelli": true,
+	"manet": true, "ingres": true,
+}
+
 func LoadCatalog() (*Catalog, error) {
 	var c Catalog
 	if err := json.Unmarshal(stylesJSON, &c); err != nil {
 		return nil, err
 	}
+	kept := c.Styles[:0]
+	for _, s := range c.Styles {
+		if !Retired[s.ID] {
+			kept = append(kept, s)
+		}
+	}
+	c.Styles = kept
 	c.byID = make(map[string]Style, len(c.Styles))
 	for _, s := range c.Styles {
 		c.byID[s.ID] = s

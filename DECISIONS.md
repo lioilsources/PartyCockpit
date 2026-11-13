@@ -408,3 +408,8 @@ Zadání: `Prompts/05-TRIBUTY-NA-PLATNO.md`.
 - Názvy stylů jsou z textu postu, jinak z katalogu PartyCockpitu, jinak
   z ID. PromoClown katalog přes API nevydává.
 - `fit` a `writeJPEG` se přesunuly ze `stylemap` do `internal/imgutil`.
+- **Vyřazené styly** (2026-11-13): na restyle_flux udělal styl `davinci-chalk`
+  z oblečeného selfie akt. FLUX negativní prompt nečte. 18 stylů (klasické
+  akty, pin-up) je v `providers.Retired`, katalog je hostům ani Studiu
+  nenabídne, i když je vrátí přegenerovaný `restyle_styles.json`.
+  Restyler je vyřazuje taky (`kRetiredRestyleStyleIds`).
