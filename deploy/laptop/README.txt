@@ -55,5 +55,37 @@ IP a narazí na limity.
 Bez internetu: certifikát pro vlastní doménu (deploy/box/README.md, krok 3,
 PC_TLS_CERT a PC_TLS_KEY).
 
+5. Show připravená doma (offline)
+---------------------------------
+Show se skládá ve Studiu (/studio/<kód>, odkaz z Cockpitu) na počítači
+s internetem a GPU. Postup přípravy je v docs/studio.md v repu.
+Na notebook u TV se přenáší jen hotové soubory:
+
+1. Z počítače, kde jsi show připravoval, zkopíruj ze složky data tyto
+   složky do data vedle programu na notebooku:
+     shows  webtoon  stylemaps  tributes  gallery-cache
+   partycockpit.db a party nekopíruj, party se zakládá na notebooku znovu.
+2. Spusť program (krok 1), založ party, otevři Studio
+   → 💾 Knihovna → Načíst → "Nahradit současnou show".
+3. Studio → ✅ Offline → "Zkontrolovat offline". Všechno má být zelené.
+4. Cockpit → "Otevřít plátno" na TV, F11. Show pustíš ▶ ve Studiu nebo
+   v Cockpitu. PANIC ji zastaví, ▶ pokračuje, kde stála.
+   ?hud=1 na konci adresy plátna ukáže, kde show je.
+
+Internet ani GPU na party nejsou potřeba. Hosté můžou dál posílat fotky
+a vzkazy: scény Galerie, Vzkazy a Pásy bez vybraných fotek je přidávají.
+
+6. Zkouška před party (30 minut)
+--------------------------------
+- Odpoj internet, Wi-Fi pro telefony nech. Kontrola offline zelená.
+- Pusť show v loopu aspoň 30 minut a sleduj, jestli se scény netrhají
+  (nejvíc Webtoon ve 4 sloupcích, Pásy s klipy, StyleMap 3×3, Tributy).
+  Když se trhají, ubere sloupců ve Studiu nebo nastav v .env
+  PC_STAGE_SCALE=0.5.
+- F5 na plátně uprostřed scény: plátno skončí na stejném místě.
+- Zavři okno serveru a spusť ho znovu: show stojí, kde byla, ▶ pokračuje.
+- Telefon jako Cockpit: lišta ⏮ ▶ ⏭ (i v /react/cockpit/<kód>).
+- Když něco spadne, vyfoť nebo zkopíruj text z okna serveru.
+
 Data party jsou ve složce data vedle programu. Týden po konci party se
 smažou sama.
