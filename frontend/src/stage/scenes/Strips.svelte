@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import type { BeatClock } from '../../lib/beat';
-  import { elapsed, rng } from '../../lib/rand';
+  import { rng } from '../../lib/rand';
+  import ZigZag from '../ZigZag.svelte';
   import { fileUrl, isVideo, type Asset } from '../../lib/types';
 
   // Pásy (D23): restyled photos in strips like Restyler's photo strip
@@ -50,85 +50,28 @@
   // clips only for the first few photos that have one (a Pi decodes ~4 videos)
   const clipIds = $derived(new Set(photos.filter((a) => a.live && isVideo(a.live)).slice(0, maxClips).map((a) => a.id)));
   const src = (a: Asset) => fileUrl(code, a.live && (clipIds.has(a.id) || !isVideo(a.live)) ? a.live : a.file);
-
-  let inners: HTMLDivElement[] = $state([]);
-  let raf = 0;
-  function frame() {
-    const t = elapsed(startedAt);
-    const v = innerHeight / 1080;
-    inners.forEach((el, i) => {
-      if (!el) return;
-      const h = el.offsetHeight / 2; // the column is rendered twice for a seamless loop
-      if (h <= 0) return;
-      const y = (t * speed * v * pace[i]) % h;
-      el.style.transform = `translate3d(0, ${i % 2 ? y - h : -y}px, 0)`;
-    });
-    raf = requestAnimationFrame(frame);
-  }
-  raf = requestAnimationFrame(frame);
-
-  let hit = $state(false);
-  const off = clock.on(() => {
-    hit = true;
-    setTimeout(() => (hit = false), 120);
-  });
-  onDestroy(() => {
-    cancelAnimationFrame(raf);
-    off();
-  });
 </script>
 
-<div class="wrap" class:hit style:--cols={cols}>
-  {#if photos.length}
-    {#each columns as col, i (i)}
-      <div class="col">
-        <div class="inner" bind:this={inners[i]}>
-          {#each [0, 1] as copy (copy)}
-            {#each col as a, j (`${copy}:${j}:${a.id}`)}
-              <figure>
-                {#if isVideo(src(a))}
-                  <video src={src(a)} autoplay loop muted playsinline></video>
-                {:else}
-                  <img src={src(a)} alt="" decoding="async" />
-                {/if}
-                {#if labels}
-                  <figcaption>{[a.meta.nickname, a.meta.fallback ? '' : a.meta.styleLabel].filter(Boolean).join(' · ')}</figcaption>
-                {/if}
-              </figure>
-            {/each}
-          {/each}
-        </div>
-      </div>
-    {/each}
-  {:else}
-    <div class="empty">
-      <h1>Pošli selfie z telefonu</h1>
-      <p>naskenuj QR vpravo dole → vyber styl → přidáš se do pásu</p>
-    </div>
-  {/if}
-</div>
+<ZigZag {columns} {pace} {speed} {clock} {startedAt} key={(a: Asset) => a.id}>
+  {#snippet item(a: Asset)}
+    <figure>
+      {#if isVideo(src(a))}
+        <video src={src(a)} autoplay loop muted playsinline></video>
+      {:else}
+        <img src={src(a)} alt="" decoding="async" />
+      {/if}
+      {#if labels}
+        <figcaption>{[a.meta.nickname, a.meta.fallback ? '' : a.meta.styleLabel].filter(Boolean).join(' · ')}</figcaption>
+      {/if}
+    </figure>
+  {/snippet}
+  {#snippet empty()}
+    <h1>Pošli selfie z telefonu</h1>
+    <p>naskenuj QR vpravo dole → vyber styl → přidáš se do pásu</p>
+  {/snippet}
+</ZigZag>
 
 <style>
-  .wrap {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 50% 30%, #1d1030, #07040c 75%);
-    display: grid;
-    grid-template-columns: repeat(var(--cols), 1fr);
-    gap: 2vw;
-    padding: 0 4vw;
-    overflow: hidden;
-  }
-  .col {
-    overflow: hidden;
-    height: 100%;
-    container-type: inline-size;
-  }
-  .inner {
-    display: flex;
-    flex-direction: column;
-    will-change: transform;
-  }
   /* Restyler strip.dart: cell 512, margin 24, label 44 */
   figure {
     /* margin, not gap: half the column height is then exactly one period */
@@ -139,7 +82,7 @@
     box-shadow: 0 2cqw 5cqw rgba(0, 0, 0, 0.55);
     transition: transform 0.15s ease-out;
   }
-  .hit figure {
+  :global(.hit) figure {
     transform: scale(1.015);
     transition: none;
   }
@@ -165,16 +108,11 @@
   figure:not(:has(figcaption)) {
     padding-bottom: 4.7cqw;
   }
-  .empty {
-    grid-column: 1 / -1;
-    place-self: center;
-    text-align: center;
-  }
-  .empty h1 {
+  h1 {
     font-size: 5vw;
     margin: 0;
   }
-  .empty p {
+  p {
     font-size: 1.8vw;
     color: var(--muted);
   }

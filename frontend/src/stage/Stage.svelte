@@ -22,6 +22,7 @@
   import Subtitles from './Subtitles.svelte';
   import StyleSweep from './scenes/StyleSweep.svelte';
   import Strips from './scenes/Strips.svelte';
+  import Tributes from './scenes/Tributes.svelte';
   import Kruh from './scenes/Kruh.svelte';
   import PairingQr from './PairingQr.svelte';
   import { Viewer, type RtcMsg } from '../lib/rtc';
@@ -240,6 +241,8 @@
         <StyleSweep params={scene.params} {clock} />
       {:else if scene.kind === 'strips'}
         <Strips {code} {queue} params={scene.params} {clock} startedAt={scene.startedAt} maxClips={party?.box ? 4 : 8} />
+      {:else if scene.kind === 'tributes'}
+        <Tributes params={scene.params} {clock} startedAt={scene.startedAt} preview={!!preview} />
       {:else if scene.kind === 'pipwall'}
         <PipWall {streams} {viewer} rev={rtcRev} {clock} />
       {:else}

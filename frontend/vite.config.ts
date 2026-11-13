@@ -12,6 +12,7 @@ export default defineConfig({
       '/files': backend,
       '/webtoon': backend,
       '/stylemaps': backend,
+      '/tributes': backend,
       '/glyphs': backend,
       '/ws': { target: backend.replace(/^http/, 'ws'), ws: true },
     },
