@@ -26,26 +26,30 @@ import (
 	"github.com/lioilsources/PartyCockpit/backend/internal/providers"
 	"github.com/lioilsources/PartyCockpit/backend/internal/store"
 	"github.com/lioilsources/PartyCockpit/backend/internal/subtitles"
+	"github.com/lioilsources/PartyCockpit/backend/internal/tribute"
 	"github.com/lioilsources/PartyCockpit/backend/internal/webtoon"
 )
 
 type Server struct {
-	Cfg        config.Config
-	Store      *store.Store
-	Hub        *hub.Hub
-	Gallery    *gallery.Client
-	DJfy       *djfy.Manager
-	Catalog    *providers.Catalog
-	Restyler   providers.Restyler
-	Animator   providers.Animator
-	Subtitles  *subtitles.Client // nil = typed subtitles only
-	Glyphs     *glyphs.Set       // nil = notes in a font
+	Cfg       config.Config
+	Store     *store.Store
+	Hub       *hub.Hub
+	Gallery   *gallery.Client
+	DJfy      *djfy.Manager
+	Catalog   *providers.Catalog
+	Restyler  providers.Restyler
+	Animator  providers.Animator
+	Subtitles *subtitles.Client // nil = typed subtitles only
+	Glyphs    *glyphs.Set       // nil = notes in a font
 	// Webtoon episodes and the pack importer (D23); Init fills them from Cfg when nil.
 	Webtoon       *webtoon.Library
 	WebtoonImport *webtoon.Installer
-	Classifier providers.Classifier
-	Web        fs.FS  // built frontend (may be empty in dev)
-	Version    string // build version, shown on the box screen
+	// PromoClown tributes (D24); Init fills them from Cfg when nil.
+	Tributes      *tribute.Library
+	TributeImport *tribute.Importer
+	Classifier    providers.Classifier
+	Web           fs.FS  // built frontend (may be empty in dev)
+	Version       string // build version, shown on the box screen
 
 	jobs  chan jobTask
 	anims chan animTask
@@ -105,6 +109,7 @@ func (s *Server) Init(ctx context.Context) error {
 	s.anims = make(chan animTask, 128)
 	s.DJfy.OnSnapshot = s.onDJfySnapshot
 	s.initWebtoon()
+	s.initTributes()
 	parties, err := s.Store.Parties(ctx)
 	if err != nil {
 		return err
@@ -231,6 +236,13 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/parties/{code}/webtoon/catalog", s.cockpit(s.webtoonCatalog))
 	mux.HandleFunc("POST /api/parties/{code}/webtoon/install", s.cockpit(s.webtoonInstall))
 	mux.HandleFunc("DELETE /api/parties/{code}/webtoon/packs/{dir}", s.cockpit(s.webtoonRemove))
+
+	mux.HandleFunc("GET /api/tributes", s.listTributes)
+	mux.HandleFunc("GET /tributes/{id}/{file}", s.serveTribute)
+	mux.HandleFunc("GET /api/parties/{code}/tributes", s.cockpit(s.tributeLibrary))
+	mux.HandleFunc("POST /api/parties/{code}/tributes/import", s.cockpit(s.tributeImport))
+	mux.HandleFunc("DELETE /api/parties/{code}/tributes/{id}", s.cockpit(s.tributeRemove))
+	mux.HandleFunc("GET /api/parties/{code}/tributes/{id}/thumb/{n}", s.party(s.tributeThumb))
 
 	mux.HandleFunc("GET /box", s.box)
 	mux.HandleFunc("GET /api/box", s.boxInfo)

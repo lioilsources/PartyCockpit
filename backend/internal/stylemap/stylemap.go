@@ -8,7 +8,6 @@
 package stylemap
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +15,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"math"
 	"os"
 	"path/filepath"
@@ -25,6 +23,8 @@ import (
 	"strings"
 
 	xdraw "golang.org/x/image/draw"
+
+	"github.com/lioilsources/PartyCockpit/backend/internal/imgutil"
 )
 
 // MinFrames is the smallest group worth a pack (a sweep of 7 frames is a slideshow).
@@ -244,7 +244,7 @@ func Build(root string, m Meta, frames []Frame) (PackInfo, error) {
 	}
 	images := make([]entry, len(frames))
 	for i, f := range frames {
-		if err := writeJPEG(filepath.Join(tmp, "t", fmt.Sprintf("%d.jpg", i)), fit(f.Img, thumbMax), 82); err != nil {
+		if err := imgutil.WriteJPEG(filepath.Join(tmp, "t", fmt.Sprintf("%d.jpg", i)), imgutil.Fit(f.Img, thumbMax), 82); err != nil {
 			return PackInfo{}, err
 		}
 		label := f.Label
@@ -264,7 +264,7 @@ func Build(root string, m Meta, frames []Frame) (PackInfo, error) {
 		r := image.Rect((k%cols)*atlasCell, (k/cols)*cellH, (k%cols+1)*atlasCell, (k/cols+1)*cellH)
 		xdraw.ApproxBiLinear.Scale(atlas, r, frames[i].Img, frames[i].Img.Bounds(), xdraw.Src, nil)
 	}
-	if err := writeJPEG(filepath.Join(tmp, "atlas.jpg"), atlas, 80); err != nil {
+	if err := imgutil.WriteJPEG(filepath.Join(tmp, "atlas.jpg"), atlas, 80); err != nil {
 		return PackInfo{}, err
 	}
 
@@ -281,30 +281,6 @@ func Build(root string, m Meta, frames []Frame) (PackInfo, error) {
 		return PackInfo{}, err
 	}
 	return PackInfo{ID: m.ID, Title: m.Title, N: len(frames), Aspect: aspect, Atlas: m.ID + "/atlas.jpg", Source: "party"}, nil
-}
-
-func fit(img image.Image, long int) image.Image {
-	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if w <= long && h <= long {
-		return img
-	}
-	if w >= h {
-		w, h = long, max(1, h*long/w)
-	} else {
-		w, h = max(1, w*long/h), long
-	}
-	out := image.NewRGBA(image.Rect(0, 0, w, h))
-	xdraw.CatmullRom.Scale(out, out.Bounds(), img, b, xdraw.Src, nil)
-	return out
-}
-
-func writeJPEG(path string, img image.Image, q int) error {
-	var b bytes.Buffer
-	if err := jpeg.Encode(&b, img, &jpeg.Options{Quality: q}); err != nil {
-		return err
-	}
-	return os.WriteFile(path, b.Bytes(), 0o644)
 }
 
 // Index lists the packs under root (folders with a map.json).

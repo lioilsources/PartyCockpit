@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"time"
@@ -345,6 +346,21 @@ func (s *Server) showReady(w http.ResponseWriter, r *http.Request, p store.Party
 			if len(ids) == 0 {
 				it.Detail = "celá show fronta (" + fmt.Sprint(len(queue)) + ")"
 			}
+		case "tributes":
+			ids := paramStrings(e.Params, "tributes")
+			for _, id := range ids {
+				if !s.Tributes.Has(id) {
+					missing = append(missing, id)
+				}
+			}
+			it.Detail = fmt.Sprintf("%d tributů", len(ids))
+			if len(ids) == 0 {
+				n := len(s.Tributes.List())
+				it.Detail = fmt.Sprintf("všechny na disku (%d)", n)
+				if n == 0 {
+					it.Status, it.Detail = "fail", "žádný tribut na disku (Studio → 🎨 Tributy)"
+				}
+			}
 		case "slideshow":
 			imgs := paramStrings(e.Params, "images")
 			for _, sha := range imgs {
@@ -414,6 +430,19 @@ func (s *Server) showPrefetch(w http.ResponseWriter, r *http.Request, p store.Pa
 		if e.Kind == "slideshow" {
 			for _, sha := range paramStrings(e.Params, "images") {
 				if _, err := s.Gallery.File(ctx, "img", sha); err != nil {
+					failed++
+				} else {
+					done++
+				}
+			}
+		}
+		if e.Kind == "tributes" && s.TributeImport.Configured() {
+			for _, id := range paramStrings(e.Params, "tributes") {
+				if s.Tributes.Has(id) {
+					continue
+				}
+				if err := s.prefetchTribute(ctx, id); err != nil {
+					slog.Warn("prefetch tribute", "id", id, "err", err)
 					failed++
 				} else {
 					done++

@@ -526,7 +526,8 @@ var sceneKinds = map[string]bool{
 	"slideshow": true, "gallery": true, "stickers": true, "nowplaying": true,
 	"webtoon": true, "lottery": true, "blank": true, "pipwall": true, "dance": true,
 	"interlude": true, "recap": true, "stylesweep": true, // M7
-	"strips": true, // D23
+	"strips":   true, // D23
+	"tributes": true, // D24
 	// "game" is set only by POST /game, which knows the players
 }
 

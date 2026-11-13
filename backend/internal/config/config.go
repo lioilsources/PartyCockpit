@@ -39,6 +39,11 @@ type Config struct {
 	WebtoonCatalogURL string // WEBTOON_CATALOG_URL
 	WebtoonAllowAdult bool   // WEBTOON_ALLOW_ADULT=1
 
+	// PromoClown tributes (D24): promo-api with the agent token, read-only.
+	// Empty URL = import off ("mock" = built-in fake tributes for development).
+	PromoURL   string // PROMO_API_URL
+	PromoToken string // PROMO_TOKEN
+
 	// DJfy relay (now playing + shared queue).
 	DJfyURL string // DJFY_URL
 
@@ -105,6 +110,8 @@ func Load() Config {
 		GalleryAllowUnclassified: env("FINETUNE_ALLOW_UNCLASSIFIED", "") == "1",
 		WebtoonCatalogURL:        env("WEBTOON_CATALOG_URL", "https://lioilsources.github.io/webtoon-content/catalog.json"),
 		WebtoonAllowAdult:        env("WEBTOON_ALLOW_ADULT", "") == "1",
+		PromoURL:                 strings.TrimRight(env("PROMO_API_URL", ""), "/"),
+		PromoToken:               env("PROMO_TOKEN", ""),
 		DJfyURL:                  strings.TrimRight(env("DJFY_URL", "https://djfy.ol1n.com"), "/"),
 		RestyleProvider:          env("RESTYLE_PROVIDER", "mock"),
 		RestylerURL:              strings.TrimRight(env("RESTYLER_API_URL", "https://restyler-api.ol1n.com"), "/"),
