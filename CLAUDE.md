@@ -37,6 +37,7 @@ make styles     # přegeneruje katalog stylů z ../Restyler
 - `frontend/src/lib/showqueue.ts` — výběr z show fronty (nové napřed, pak loop/shuffle); `lib/rand.ts` seed scén
 - `backend/internal/webtoon` — Toonfork katalog, import zip packů, epizody; `stage/scenes/Strip`, `Bubbles` (D23)
 - `backend/internal/stylemap` + `api/stylemaps.go` — StyleMap packy ze session FineTuneGallery (D23)
+- `backend/internal/tribute` + `api/tributes.go` — tributy z PromoClown na disk; `stage/scenes/Tributes`, `stage/ZigZag` (D24)
 - `api/show.go`, `showlib.go`, `studio.go` + `frontend/src/studio` — Scene Studio, offline show (`docs/studio.md`)
 
 ## Invarianty

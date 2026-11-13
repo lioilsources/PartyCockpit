@@ -9,6 +9,7 @@ export type SceneParams = {
   lang?: string;
   speed?: number;
   cols?: number;
+  layout?: 'grid' | 'strip';
   pack?: string;
   packs?: string[];
   transition?: string;

@@ -8,6 +8,7 @@
   import Clip from '../lib/Clip.svelte';
   import { Mic } from '../lib/mic';
   import { listPacks, type PackInfo } from '../lib/stylemap';
+  import { COLS, tributeParams, type TributeLayout } from '../lib/tributes';
 
   let { code }: { code: string } = $props();
 
@@ -176,6 +177,7 @@
     { kind: 'interlude', label: '🌀 Shader přestávka' },
     { kind: 'stylesweep', label: '🎨 StyleMap' },
     { kind: 'strips', label: '🎞 Pásy' },
+    { kind: 'tributes', label: '🎨 Tributy' },
     { kind: 'recap', label: '🎞 Recap (konec)' },
     { kind: 'blank', label: '✨ Mezihra' },
   ];
@@ -201,6 +203,13 @@
   });
   let stripCols = $state(Number(store.get('pc.strips.cols')) || 3);
   $effect(() => store.set('pc.strips.cols', String(stripCols)));
+  // tributes (D24): sheets as a 2×2 grid or a 1×4 strip; which ones is picked in the Studio
+  let tributeLayout = $state<TributeLayout>(store.get('pc.tributes.layout') === 'strip' ? 'strip' : 'grid');
+  let tributeCols = $state(Number(store.get('pc.tributes.cols')) || COLS.grid.def);
+  $effect(() => {
+    store.set('pc.tributes.layout', tributeLayout);
+    store.set('pc.tributes.cols', String(tributeCols));
+  });
   let slideStyle = $state('');
   let beats = $state(8);
   let episodes = $state<Episode[]>([]);
@@ -233,6 +242,7 @@
     const params: Record<string, unknown> = { beats };
     if (kind === 'slideshow' && slideStyle) params.style = slideStyle;
     if (kind === 'strips') params.cols = stripCols;
+    if (kind === 'tributes') Object.assign(params, tributeParams(tributeLayout, tributeCols));
     if (kind === 'webtoon') {
       if (wtEpisodes.length) params.episodes = wtEpisodes;
       params.lang = wtLang;
@@ -397,6 +407,13 @@
         <label>přepnout každých <input type="number" min="2" max="64" bind:value={beats} /> dob</label>
         <label>styl slideshow <input placeholder="(všechny) styleId" bind:value={slideStyle} /></label>
         <label>pásy <input type="number" min="2" max="5" bind:value={stripCols} /> sloupce</label>
+        <label>tributy
+          <select bind:value={tributeLayout}>
+            <option value="grid">mřížka 2×2</option>
+            <option value="strip">proužek 1×4</option>
+          </select>
+          <input type="number" min={COLS[tributeLayout].min} max={COLS[tributeLayout].max} bind:value={tributeCols} /> sloupce
+        </label>
         <label>shader
           <select bind:value={shader}>
             <option value="">(střídat)</option>

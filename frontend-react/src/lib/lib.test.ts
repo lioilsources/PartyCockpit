@@ -4,8 +4,9 @@ import { parseRoute } from '../route';
 import { ago, cx, extendedEnd } from './format';
 import { moved } from './queue';
 import { sceneParams, toggledEpisode } from './scene';
+import { sheetAspect, tributeOptions } from '@pc/lib/tributes';
 
-const opts = { beats: 8, slideStyle: '', episodes: [] as string[], wtLang: 'cs', wtSpeed: 60, stripCols: 3, pack: '', sweepPacks: [] as string[], sweepTransition: false, shader: '' };
+const opts = { beats: 8, slideStyle: '', episodes: [] as string[], wtLang: 'cs', wtSpeed: 60, stripCols: 3, tributeLayout: 'grid' as const, tributeCols: 2, pack: '', sweepPacks: [] as string[], sweepTransition: false, shader: '' };
 
 describe('sceneParams', () => {
   it('matches what the Svelte Cockpit sends', () => {
@@ -16,12 +17,31 @@ describe('sceneParams', () => {
     expect(sceneParams('webtoon', { ...opts, episodes: ['party', 'ep_1'], wtLang: 'en' })).toEqual({ beats: 8, episodes: ['party', 'ep_1'], lang: 'en', speed: 60 });
     expect(sceneParams('webtoon', opts)).toEqual({ beats: 8, lang: 'cs', speed: 60 });
     expect(sceneParams('strips', { ...opts, stripCols: 4 })).toEqual({ beats: 8, cols: 4 });
+    expect(sceneParams('tributes', opts)).toEqual({ beats: 8, layout: 'grid', cols: 2 });
+    expect(sceneParams('tributes', { ...opts, tributeLayout: 'strip', tributeCols: 12 })).toEqual({ beats: 8, layout: 'strip', cols: 8 });
+    expect(sceneParams('tributes', { ...opts, tributeCols: 7 })).toEqual({ beats: 8, layout: 'grid', cols: 4 });
     expect(sceneParams('stylesweep', { ...opts, pack: 'cat', sweepPacks: ['a', 'b'] })).toEqual({ beats: 8, pack: 'a', packs: ['a', 'b'] });
   });
 
   it('keeps at most 4 webtoon columns', () => {
     expect(toggledEpisode(['a', 'b', 'c', 'd'], 'e')).toEqual(['b', 'c', 'd', 'e']);
     expect(toggledEpisode(['a', 'b'], 'a')).toEqual(['b']);
+  });
+});
+
+describe('tributes', () => {
+  const t = { frames: [{ w: 832, h: 1216, sw: 438, sh: 640 }, { w: 832, h: 1216, sw: 438, sh: 640 }, { w: 832, h: 1216, sw: 438, sh: 640 }, { w: 832, h: 1216, sw: 438, sh: 640 }] };
+  it('reads scene params with bounds', () => {
+    expect(tributeOptions({})).toEqual({ layout: 'grid', cols: 2, speed: 40, labels: true, ids: [] });
+    expect(tributeOptions({ layout: 'strip', cols: 1, speed: 999, labels: false, tributes: ['7', '../x', 3] })).toEqual({ layout: 'strip', cols: 2, speed: 300, labels: false, ids: ['7'] });
+  });
+  it('sizes a sheet like Restyler', () => {
+    // grid: 1096 wide; two rows of 512×748 cells, labels 44, margins 24, foot 66
+    expect(sheetAspect(t, 'grid', true)).toBeCloseTo((24 + 2 * (512 * (1216 / 832) + 44) + 24 + 66) / 1096, 5);
+    // strip: 560 wide, four rows
+    expect(sheetAspect(t, 'strip', false)).toBeCloseTo((24 + 4 * 512 * (1216 / 832) + 3 * 24 + 66) / 560, 5);
+    // one frame on a grid sheet spans its width
+    expect(sheetAspect({ frames: [t.frames[0]] }, 'grid', false)).toBeCloseTo((24 + 1048 * (1216 / 832) + 66) / 1096, 5);
   });
 });
 

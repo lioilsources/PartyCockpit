@@ -387,3 +387,24 @@ Zadání: `Prompts/04-STRIPY-STYLEMAPY-STUDIO.md`, postup: `docs/studio.md`.
     („Kniha — Díl“), knihovna ho z příběhu ořízne.
   - Panely packů nejsou vždy na výšku (Sára má polovinu 1216×832), sloupce
     proto berou poměr stran z dat panelu.
+
+## D24: Tributy z PromoClown na plátně (2026-11-13)
+Zadání: `Prompts/05-TRIBUTY-NA-PLATNO.md`.
+- **Zdroj** je promo-api (`PROMO_API_URL`, `PROMO_TOKEN`). PartyCockpit
+  posílá jen GET s agent tokenem v hlavičce, redirect nesleduje. Bere
+  tributy `drafted`, jejichž post není `rejected`. `PROMO_API_URL=mock`
+  dá šest vymyšlených tributů pro vývoj.
+- **Stažení je schválení.** Operátor tribut ve Studiu vybere a stáhne do
+  `data/tributes/<id>/` (JPEG do 1344 px a malá kopie do 640 px). Plátno
+  čte jen disk, proto scéna běží offline a bez promo-api. Původní obrázek
+  autora se nestahuje. Cesty assetů promo-api backend neopouštějí.
+- **Scéna `tributes`**: jeden tribut je jeden arch podle Restyleru, mřížka
+  2×2 nebo proužek 1×4, s názvem stylu pod snímkem. Kredit `@autor` je na
+  archu vždy. Archy rolují cik cak jako Pásy (sdílený `ZigZag.svelte`),
+  arch skládá plátno v CSS.
+- Tributy jsou globální knihovna jako webtoon packy: nejsou assety party,
+  nejdou do recapu a do uložené show se nekopírují (na notebook se nese
+  složka `tributes`).
+- Názvy stylů jsou z textu postu, jinak z katalogu PartyCockpitu, jinak
+  z ID. PromoClown katalog přes API nevydává.
+- `fit` a `writeJPEG` se přesunuly ze `stylemap` do `internal/imgutil`.

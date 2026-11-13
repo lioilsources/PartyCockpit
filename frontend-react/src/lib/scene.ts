@@ -1,4 +1,5 @@
 import type { SceneKind } from '@pc/lib/types';
+import { tributeParams, type TributeLayout } from '@pc/lib/tributes';
 import type { SceneParams } from '../api/cockpitApi';
 
 export const SCENES: readonly { kind: SceneKind; label: string }[] = [
@@ -13,6 +14,7 @@ export const SCENES: readonly { kind: SceneKind; label: string }[] = [
   { kind: 'interlude', label: '🌀 Shader přestávka' },
   { kind: 'stylesweep', label: '🎨 StyleMap' },
   { kind: 'strips', label: '🎞 Pásy' },
+  { kind: 'tributes', label: '🎨 Tributy' },
   { kind: 'recap', label: '🎞 Recap (konec)' },
   { kind: 'blank', label: '✨ Mezihra' },
 ];
@@ -35,6 +37,9 @@ export type SceneOptions = {
   wtSpeed: number;
   /** Pásy (D23): 2–5 columns. */
   stripCols: number;
+  /** Tributy (D24): 2×2 grid or 1×4 strip, columns within its bounds. */
+  tributeLayout: TributeLayout;
+  tributeCols: number;
   pack: string;
   /** StyleMap tiles (D23), up to 9; empty = `pack` alone. */
   sweepPacks: string[];
@@ -56,6 +61,7 @@ export function sceneParams(kind: SceneKind, o: SceneOptions): SceneParams {
   const params: SceneParams = { beats: o.beats };
   if (kind === 'slideshow' && o.slideStyle) params.style = o.slideStyle;
   if (kind === 'strips') params.cols = o.stripCols;
+  if (kind === 'tributes') Object.assign(params, tributeParams(o.tributeLayout, o.tributeCols));
   if (kind === 'webtoon') {
     if (o.episodes.length) params.episodes = [...o.episodes];
     params.lang = o.wtLang;

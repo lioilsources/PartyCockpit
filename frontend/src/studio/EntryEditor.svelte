@@ -2,6 +2,7 @@
   import { api } from '../lib/api';
   import { fileUrl, type Asset, type Episode, type GalleryImage, type ShowEntry } from '../lib/types';
   import type { PackInfo } from '../lib/stylemap';
+  import { COLS, MAX_TRIBUTES, creditLine, tributeOptions, type Tribute } from '../lib/tributes';
   import { asList, kindLabel, newSeed, toggle } from './kinds';
 
   // The parameters and items of one show entry (D23). Every change goes up
@@ -38,6 +39,22 @@
       galleryErr = e.message;
     }
   }
+  // tributes: the ones on disk (Studio → 🎨 Tributy imports them)
+  let tributes = $state<Tribute[]>([]);
+  $effect(() => {
+    if (entry.kind !== 'tributes') return;
+    api
+      .get<Tribute[]>('/api/tributes')
+      .then((r) => (tributes = r))
+      .catch(() => {});
+  });
+  const topt = $derived(tributeOptions(entry.params));
+  function setLayout(layout: string) {
+    const c = COLS[layout === 'strip' ? 'strip' : 'grid'];
+    entry.params = { ...entry.params, layout, cols: Math.min(c.max, Math.max(c.min, topt.cols)) };
+    onchange();
+  }
+
   const shaders = [
     ['', '(střídat)'],
     ['plasma', 'Plazma'],
@@ -104,6 +121,30 @@
         </button>
       {:else}
         <p class="muted">Ve frontě nejsou fotky: nahraj je v Přípravě → Fotky.</p>
+      {/each}
+    </div>
+  {:else if entry.kind === 'tributes'}
+    <div class="row small">
+      <label>rozložení
+        <select value={topt.layout} onchange={(e) => setLayout(e.currentTarget.value)}>
+          <option value="grid">Mřížka 2×2</option>
+          <option value="strip">Proužek 1×4</option>
+        </select>
+      </label>
+      <label>sloupce <input type="number" min={COLS[topt.layout].min} max={COLS[topt.layout].max} value={topt.cols} onchange={(e) => set('cols', Number(e.currentTarget.value))} /></label>
+      <label>rychlost <input type="number" min="5" max="300" step="5" value={topt.speed} onchange={(e) => set('speed', Number(e.currentTarget.value))} /> px/s</label>
+      <label><input type="checkbox" checked={topt.labels} onchange={(e) => set('labels', e.currentTarget.checked)} /> styly pod snímky</label>
+      <span class="muted">{topt.ids.length ? `${topt.ids.length} vybraných` : 'všechny na disku'}</span>
+      {#if topt.ids.length}<button onclick={() => set('tributes', [])}>všechny</button>{/if}
+    </div>
+    <div class="thumbs">
+      {#each tributes as t (t.id)}
+        <button class="thumb" class:on={topt.ids.includes(t.id)} onclick={() => set('tributes', toggle(topt.ids, t.id, MAX_TRIBUTES))} title={creditLine(t.credit)}>
+          <img src={`/tributes/${t.id}/0s.jpg?v=${t.v}`} alt="" />
+          {#if topt.ids.includes(t.id)}<span class="n">{topt.ids.indexOf(t.id) + 1}</span>{/if}
+        </button>
+      {:else}
+        <p class="muted">Na disku nejsou tributy: stáhni je v Přípravě → 🎨 Tributy.</p>
       {/each}
     </div>
   {:else if entry.kind === 'stylesweep'}

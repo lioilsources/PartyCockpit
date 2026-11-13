@@ -6,6 +6,7 @@ import type { SceneKind, ShowEntry } from '../lib/types';
 export const KINDS: { kind: SceneKind; label: string; seconds: number; params: Record<string, unknown> }[] = [
   { kind: 'webtoon', label: '📖 Webtoon', seconds: 90, params: { episodes: [], lang: 'cs', speed: 60 } },
   { kind: 'strips', label: '🎞 Pásy', seconds: 60, params: { cols: 3, speed: 40, labels: true, assets: [] } },
+  { kind: 'tributes', label: '🎨 Tributy', seconds: 90, params: { layout: 'grid', cols: 2, speed: 40, labels: true, tributes: [] } },
   { kind: 'stylesweep', label: '🎨 StyleMap', seconds: 45, params: { packs: [] } },
   { kind: 'slideshow', label: '🖼 Slideshow', seconds: 60, params: { beats: 8, images: [] } },
   { kind: 'gallery', label: '📸 Galerie hostů', seconds: 60, params: { beats: 8 } },

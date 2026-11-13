@@ -167,6 +167,20 @@ knihovny a načtení do nové party funguje i z UI.
 `breeze` na Wan (kvalita vlasů), výkon 4 sloupců s animovanými panely a pásů
 s klipy na Raspberry Pi, reálná session FineTuneGallery (za CF Access).
 
+## 2026-11-13: Tributy z PromoClown (D24)
+
+| Část | Stav |
+|---|---|
+| `internal/tribute`: promo-api (jen GET, token v hlavičce), import na disk, náhledy, mock | ✅ testy proti falešnému promo-api |
+| scéna Tributy: arch mřížka 2×2 / proužek 1×4, kredit, cik cak (`ZigZag` sdílený s Pásy) | ✅ Chrome (mock) |
+| Studio 🎨 Tributy, scéna ve show, offline kontrola a stažení do cache, oba Cockpity | ✅ testy, Studio v Chrome |
+
+Ověřeno v Chrome na `PROMO_API_URL=mock`: stažení 5 tributů ve Studiu, náhled
+nestaženého přes klíč, mřížka ve 2 sloupcích jede proti sobě, proužek ve
+4 sloupcích bez popisků, kredit na každém archu, konzole bez chyb.
+**Neověřeno:** skutečné promo-api (pořadí `media_paths` proti `styles`
+je vyčtené ze zdrojáků PromoClown), výkon archů na TV.
+
 ## Další kroky
 1. Vyplnit `.env` (Restyler token, CF Access token) a vyzkoušet s živým Restylerem a DJfy.
 2. Rozhodnout, kde poběží party box. Na JODA je to Compose s portem v LAN (viz `deploy/`).

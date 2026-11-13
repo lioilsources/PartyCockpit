@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { listPacks, type PackInfo } from '@pc/lib/stylemap';
 import { plural, recapUrl, type Episode, type SceneKind } from '@pc/lib/types';
 import { useCockpit } from '../CockpitContext';
+import { COLS, type TributeLayout } from '@pc/lib/tributes';
 import { SCENES, SHADERS, WEBTOON_LANGS, sceneParams, toggled, toggledEpisode } from '../lib/scene';
 import { asFlag, asJson, asString, useStoredState } from '../hooks/useStoredState';
 import { cx } from '../lib/format';
@@ -19,6 +20,8 @@ export function ScenePanel() {
   const [wtLang, setWtLang] = useStoredState('pc.webtoon.lang', 'cs', asString);
   const [wtSpeed, setWtSpeed] = useStoredState('pc.webtoon.speed', 60, speedCodec);
   const [stripCols, setStripCols] = useStoredState('pc.strips.cols', 3, colsCodec);
+  const [tributeLayout, setTributeLayout] = useStoredState<TributeLayout>('pc.tributes.layout', 'grid', layoutCodec);
+  const [tributeCols, setTributeCols] = useStoredState('pc.tributes.cols', COLS.grid.def, tributeColsCodec);
   const [packs, setPacks] = useState<PackInfo[]>([]);
   const [pack, setPack] = useStoredState('pc.stylemap', '', asString);
   const [sweepTransition, setSweepTransition] = useStoredState('pc.stylemap.transition', false, asFlag);
@@ -44,7 +47,7 @@ export function ScenePanel() {
     };
   }, [api, setPack]);
 
-  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, stripCols, pack, sweepPacks, sweepTransition, shader })));
+  const setScene = (kind: SceneKind) => act(() => api.scene(kind, sceneParams(kind, { beats, slideStyle, episodes: wtEpisodes, wtLang, wtSpeed, stripCols, tributeLayout, tributeCols, pack, sweepPacks, sweepTransition, shader })));
 
   return (
     <section className={ui.section}>
@@ -98,6 +101,28 @@ export function ScenePanel() {
             value={stripCols}
             onChange={(e) => {
               setStripCols(e.target.valueAsNumber || 3);
+            }}
+          />{' '}
+          sloupce
+        </label>
+        <label>
+          tributy{' '}
+          <select
+            value={tributeLayout}
+            onChange={(e) => {
+              setTributeLayout(e.target.value === 'strip' ? 'strip' : 'grid');
+            }}
+          >
+            <option value="grid">mřížka 2×2</option>
+            <option value="strip">proužek 1×4</option>
+          </select>{' '}
+          <input
+            type="number"
+            min={COLS[tributeLayout].min}
+            max={COLS[tributeLayout].max}
+            value={tributeCols}
+            onChange={(e) => {
+              setTributeCols(e.target.valueAsNumber || COLS[tributeLayout].def);
             }}
           />{' '}
           sloupce
@@ -232,4 +257,6 @@ export function ScenePanel() {
 
 const episodeList = asJson<string[]>();
 const speedCodec = { parse: (raw: string) => Number(raw) || 60, serialize: (v: number) => String(v) };
+const layoutCodec = { parse: (raw: string): TributeLayout => (raw === 'strip' ? 'strip' : 'grid'), serialize: (v: TributeLayout) => v };
+const tributeColsCodec = { parse: (raw: string) => Number(raw) || COLS.grid.def, serialize: (v: number) => String(v) };
 const colsCodec = { parse: (raw: string) => Number(raw) || 3, serialize: (v: number) => String(v) };

@@ -26,6 +26,8 @@ Mac Mini, Windows mini PC nebo domácí server.
   roluje svým tempem, bubliny kreslí plátno (čeština a další jazyky).
 - **Pásy**: přemalované fotky v pásech jako v Restyleru, sloupce rolují cik cak.
   Místo fotky hraje její klip: mrknutí a úsměv, nebo vlasy ve větru.
+- **Tributy**: čtveřice restylů z PromoClown jako bílý arch, mřížka 2×2 nebo
+  proužek 1×4, s kreditem `@autor`. Archy rolují cik cak jako Pásy.
 - **Losování**: kdo hraje o přestávce.
 - **Tančírna**: hosté tančí na plátně. Telefon → „Roztanči mě“ → Wan na GPU → schválení.
 - **Živé portréty**: fotky v galerii mrkají a rozhlížejí se (LivePortrait).
@@ -67,6 +69,7 @@ Docker: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --bui
 | AiStack | záloha restyle (flux-kontext), NSFW tagger (WD14) | `AISTACK_URL`, `MODERATION=aistack` |
 | FineTuneGallery | obrázky do slideshow, sessions pro StyleMap packy | `FINETUNE_URL` |
 | Toonfork (webtoon-content) | hotové webtoon příběhy (zip packy na GitHub Releases) | `WEBTOON_CATALOG_URL`, `WEBTOON_ALLOW_ADULT` |
+| PromoClown (promo-api, jen domácí síť) | tributy: 4 restyly obrázku jiného autora s kreditem `@autor` | `PROMO_API_URL`, `PROMO_TOKEN` (agent token) |
 | ComfyUI (L40S) | živé portréty (LivePortrait) a tanec (Wan 2.2 I2V) | `ANIMATE_PROVIDER=comfy`, `COMFY_URL` |
 | DJfy | now playing, sdílená fronta, hlasování, BPM | `DJFY_URL` + v Cockpitu kód DJfy party |
 

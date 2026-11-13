@@ -10,6 +10,7 @@
   import StyleMapBuilder from './StyleMapBuilder.svelte';
   import Ready from './Ready.svelte';
   import ShowLibrary from './ShowLibrary.svelte';
+  import TributeLibrary from './TributeLibrary.svelte';
   import { KINDS, kindLabel, newEntry, studioApi } from './kinds';
 
   // Scene Studio (D23): the show is prepared here ahead of the party, the GPU
@@ -169,7 +170,7 @@
   const previewUrl = $derived(st && selected ? `/stage/${code}?key=${st.config.stageKey}&preview=${selected}` : '');
   let previewOn = $state(true);
 
-  let tab = $state<'photos' | 'webtoon' | 'stylemap' | 'ready' | 'library'>('photos');
+  let tab = $state<'photos' | 'webtoon' | 'stylemap' | 'tributes' | 'ready' | 'library'>('photos');
   const onerror = (m: string) => (err = m);
 </script>
 
@@ -265,6 +266,7 @@
           <button class:on={tab === 'photos'} onclick={() => (tab = 'photos')}>📸 Fotky</button>
           <button class:on={tab === 'webtoon'} onclick={() => (tab = 'webtoon')}>📚 Webtoon</button>
           <button class:on={tab === 'stylemap'} onclick={() => (tab = 'stylemap')}>🧪 StyleMap</button>
+          <button class:on={tab === 'tributes'} onclick={() => (tab = 'tributes')}>🎨 Tributy</button>
           <button class:on={tab === 'ready'} onclick={() => (tab = 'ready')}>✅ Offline</button>
           <button class:on={tab === 'library'} onclick={() => (tab = 'library')}>💾 Knihovna</button>
         </nav>
@@ -274,6 +276,8 @@
           <WebtoonLibrary {call} onchange={refresh} {onerror} />
         {:else if tab === 'stylemap'}
           <StyleMapBuilder {call} {packs} onchange={refresh} {onerror} />
+        {:else if tab === 'tributes' && st}
+          <TributeLibrary {call} {code} fileKey={st.config.fileKey} {onerror} />
         {:else if tab === 'ready'}
           <Ready {call} {onerror} />
         {:else if tab === 'library'}

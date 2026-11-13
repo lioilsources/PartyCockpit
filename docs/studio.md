@@ -33,22 +33,26 @@ sloupců, začátky, pořadí. Rozhodnutí: `DECISIONS.md` D23.
 5. **StyleMap** (🧪 StyleMap): vyber session z FineTuneGallery a zaškrtni
    prompty. Každý prompt je jeden pack v `PC_DATA_DIR/stylemaps/`, stavba
    trvá sekundy a GPU nepotřebuje.
-6. **Show**: přidávej scény na konec, ↑ ↓ pořadí, ⧉ kopie, délka, seed
+6. **Tributy** (🎨 Tributy): s `PROMO_API_URL` a `PROMO_TOKEN` (agent token
+   PromoClown, jen v domácí síti) ukáže hotové tributy se stavem postu.
+   Vyber a stáhni je do `PC_DATA_DIR/tributes/`. Na plátno jde jen to, co
+   stáhneš. Kredit `@autor` je na archu vždy, originál autora se nestahuje.
+7. **Show**: přidávej scény na konec, ↑ ↓ pořadí, ⧉ kopie, délka, seed
    (🎲 jiný průběh) a StyleMap přechod. Náhled kreslí vybranou scénu od
    začátku a po každé změně ji pustí znovu.
-7. **✅ Offline**: „Stáhnout do cache“ (obrázky slideshow, packy
-   z FineTuneGallery), pak „Zkontrolovat offline“. Zelené = scéna poběží
-   bez sítě.
-8. **💾 Knihovna → Uložit**: show s fotkami a klipy jde do
+8. **✅ Offline**: „Stáhnout do cache“ (obrázky slideshow, packy
+   z FineTuneGallery, vybrané tributy), pak „Zkontrolovat offline“.
+   Zelené = scéna poběží bez sítě.
+9. **💾 Knihovna → Uložit**: show s fotkami a klipy jde do
    `PC_DATA_DIR/shows/<název>/`. Úklid party ji nemaže.
-9. `sparkctl done $id '{"images":{"ok":N,"failed":M}}'`
+10. `sparkctl done $id '{"images":{"ok":N,"failed":M}}'`
 
 ## Na party (offline)
 
 1. Na notebooku u TV spusť PartyCockpit se stejným `PC_DATA_DIR`. Internet ani
    GPU nejsou potřeba. Když jsi připravoval na jiném počítači, zkopíruj z jeho
-   `PC_DATA_DIR` složky `shows`, `webtoon`, `stylemaps` a `gallery-cache` do
-   `data` vedle programu na notebooku. `partycockpit.db` a `party` nekopíruj:
+   `PC_DATA_DIR` složky `shows`, `webtoon`, `stylemaps`, `tributes`
+   a `gallery-cache` do `data` vedle programu na notebooku. `partycockpit.db` a `party` nekopíruj:
    party se zakládá na notebooku znovu.
 2. Založ party, otevři Studio → 💾 Knihovna → Načíst → „Nahradit současnou
    show“. Fotky a klipy se zkopírují do party jako schválené.
@@ -67,6 +71,7 @@ vybraných fotek hrají celou show frontu, takže se k nim přidávají.
 | Webtoon | epizody stažené ve 📚 Webtoon (Party epizoda vždy) |
 | Pásy | fotky a klipy jsou v party (Studio nebo knihovna) |
 | StyleMap | lokální packy vždy, packy z FineTuneGallery po „Stáhnout do cache“ |
+| Tributy | stažené v 🎨 Tributy (promo-api na party není potřeba) |
 | Slideshow | jen s vybranými obrázky po „Stáhnout do cache“ |
 | Galerie, Vzkazy, Tančírna, Recap | vždy (show fronta party) |
 | Shader přestávka, Mezihra | vždy |
