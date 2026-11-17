@@ -41,14 +41,13 @@ make styles     # přegeneruje katalog stylů z ../Restyler
   Originál po selhaném restyle se nikdy neschvaluje automaticky.
 - Originální fotky (`kind=upload`, `status=source`) se na plátno nedostanou nikdy.
 - Živý portrét dědí schválení fotky. Tanec čeká na operátora vždy, i v relaxed režimu.
-- GPU pro animace jede přes L40S session (ComfyUI). SPARK jen přes broker.
+- GPU pro animace jede přes L40S session (ComfyUI).
 - Živý stream jde na plátno až po „pustit“ v Cockpitu. Server plátnu neposílá pending streamy.
 - GPU se nečeká synchronně: upload vrátí 202, job běží ve worker poolu.
 - Limit 1 rozpracovaný restyle na hosta.
 - ID hosta je jeho tajný klíč: nikdy do fronty, scén ani zpráv pro ostatní (D17).
 - Plátno se připojuje jen se `stage_key`; zápisy hostů končí s `ends_at` a mají limity (D19).
 - Tokeny a klíče nepatří do URL ani logu; `/files` vydá veřejně jen schválené (D19).
-- Repo je veřejné: žádné LAN IP, tokeny, domácí cesty. Vše přes `.env` (`.env.example`).
 - Migrace, které už vyšly, se needitují; přidává se nová na konec `migrations`.
 - Stage musí přežít výpadek backendu: cache stavu v localStorage, scény jedou dál.
 
