@@ -14,3 +14,17 @@ backend/internal/web/dist/*
 *.db-wal
 *.db-shm
 /dist/
+# devconv:start
+*.p8
+*.p12
+*.jks
+key.properties
+.claude/settings.local.json
+CLAUDE.local.md
+bin/
+*.test
+*.out
+dist/
+.astro/
+.svelte-kit/
+# devconv:end
